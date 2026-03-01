@@ -6,8 +6,11 @@ import '@/styles/arco-ui/index.less'
 
 // 额外引入 Arco Design Icon图标库
 import ArcoVueIcon from '@arco-design/web-vue/es/icon'
+import ContextMenu from '@imengyu/vue3-context-menu'
 import App from './App.vue'
 import router from './router'
+
+import '@imengyu/vue3-context-menu/lib/vue3-context-menu.css'
 
 // 使用动画库
 import 'animate.css/animate.min.css'
@@ -38,6 +41,7 @@ app.use(router)
 app.use(pinia)
 app.use(ArcoVue)
 app.use(ArcoVueIcon)
+app.use(ContextMenu)
 app.use(directives)
 
 app.mount('#app')

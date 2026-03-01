@@ -21,6 +21,7 @@
     "@codemirror/lang-vue": "^0.1.2",
     "@codemirror/theme-one-dark": "^6.1.2",
     "@ddietr/codemirror-themes": "^1.4.2",
+    "@imengyu/vue3-context-menu": "^1.5.4",
     "@vue-office/docx": "1.6.0",
     "@vue-office/excel": "1.7.1",
     "@vue-office/pdf": "1.6.4",
