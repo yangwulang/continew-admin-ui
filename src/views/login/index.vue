@@ -14,17 +14,26 @@
       </a-col>
       <a-col :xs="24" :sm="12" :md="11">
         <div class="login-right">
-          <h3 v-if="isEmailLogin" class="login-right__title">邮箱登录</h3>
-          <EmailLogin v-if="isEmailLogin" />
-          <a-tabs v-else v-model:activeKey="activeTab" class="login-right__form">
-            <a-tab-pane key="1" title="账号登录">
-              <component :is="AccountLogin" v-if="activeTab === '1'" />
-            </a-tab-pane>
-            <a-tab-pane key="2" title="手机号登录">
-              <component :is="PhoneLogin" v-if="activeTab === '2'" />
-            </a-tab-pane>
-          </a-tabs>
-          <div class="login-right__oauth">
+          <template v-if="isRegisterMode">
+            <h3 class="login-right__title">用户注册</h3>
+            <RegisterForm @switch-to-login="switchToLogin" />
+          </template>
+          <template v-else>
+            <h3 v-if="isEmailLogin" class="login-right__title">邮箱登录</h3>
+            <EmailLogin v-if="isEmailLogin" />
+            <a-tabs v-else v-model:activeKey="activeTab" class="login-right__form">
+              <a-tab-pane key="1" title="账号登录">
+                <component :is="AccountLogin" v-if="activeTab === '1'" />
+              </a-tab-pane>
+              <a-tab-pane key="2" title="手机号登录">
+                <component :is="PhoneLogin" v-if="activeTab === '2'" />
+              </a-tab-pane>
+            </a-tabs>
+            <div class="login-right__actions">
+              <a-link @click="switchToRegister">没有账号？立即注册</a-link>
+            </div>
+          </template>
+          <div v-if="!isRegisterMode" class="login-right__oauth">
             <a-divider orientation="center">其他登录方式</a-divider>
             <div class="list">
               <div v-if="isEmailLogin" class="mode item" @click="toggleLoginMode"><icon-user /> 账号/手机号登录</div>
@@ -63,20 +72,29 @@
     <a-row align="stretch" class="login-box">
       <a-col :xs="24" :sm="12" :md="11">
         <div class="login-right">
-          <h3 v-if="isEmailLogin" class="login-right__title">邮箱登录</h3>
-          <EmailLogin v-if="isEmailLogin" />
-          <a-tabs v-else v-model:activeKey="activeTab" class="login-right__form">
-            <a-tab-pane key="1" title="账号登录">
-              <component :is="AccountLogin" v-if="activeTab === '1'" />
-            </a-tab-pane>
-            <a-tab-pane key="2" title="手机号登录">
-              <component :is="PhoneLogin" v-if="activeTab === '2'" />
-            </a-tab-pane>
-          </a-tabs>
+          <template v-if="isRegisterMode">
+            <h3 class="login-right__title">用户注册</h3>
+            <RegisterForm @switch-to-login="switchToLogin" />
+          </template>
+          <template v-else>
+            <h3 v-if="isEmailLogin" class="login-right__title">邮箱登录</h3>
+            <EmailLogin v-if="isEmailLogin" />
+            <a-tabs v-else v-model:activeKey="activeTab" class="login-right__form">
+              <a-tab-pane key="1" title="账号登录">
+                <component :is="AccountLogin" v-if="activeTab === '1'" />
+              </a-tab-pane>
+              <a-tab-pane key="2" title="手机号登录">
+                <component :is="PhoneLogin" v-if="activeTab === '2'" />
+              </a-tab-pane>
+            </a-tabs>
+            <div class="login-right__actions">
+              <a-link @click="switchToRegister">没有账号？立即注册</a-link>
+            </div>
+          </template>
         </div>
       </a-col>
     </a-row>
-    <div class="login-right__oauth">
+    <div v-if="!isRegisterMode" class="login-right__oauth">
       <a-divider orientation="center">其他登录方式</a-divider>
       <div class="list">
         <div v-if="isEmailLogin" class="mode item" @click="toggleLoginMode"><icon-user /> 账号/手机号登录</div>
@@ -101,6 +119,7 @@ import Background from './components/background/index.vue'
 import AccountLogin from './components/account/index.vue'
 import PhoneLogin from './components/phone/index.vue'
 import EmailLogin from './components/email/index.vue'
+import RegisterForm from './components/register/index.vue'
 import { socialAuth } from '@/apis/auth'
 import { useAppStore } from '@/stores'
 import { useTenantStore } from '@/stores/modules/tenant'
@@ -117,11 +136,22 @@ const title = computed(() => appStore.getTitle())
 const logo = computed(() => appStore.getLogo())
 
 const isEmailLogin = ref(false)
+const isRegisterMode = ref(false)
 const activeTab = ref('1')
 
 // 切换登录模式
 const toggleLoginMode = () => {
   isEmailLogin.value = !isEmailLogin.value
+}
+
+// 切换到注册
+const switchToRegister = () => {
+  isRegisterMode.value = true
+}
+
+// 切换到登录
+const switchToLogin = () => {
+  isRegisterMode.value = false
 }
 
 // 第三方登录授权
@@ -240,6 +270,12 @@ onMounted(() => {
       :deep(.arco-tabs-tab-title:before) {
         display: none;
       }
+    }
+
+    &__actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 4px;
     }
 
     &__oauth {
@@ -456,6 +492,12 @@ onMounted(() => {
       :deep(.arco-tabs-tab-title:before) {
         display: none;
       }
+    }
+
+    &__actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 4px;
     }
 
     &__oauth {

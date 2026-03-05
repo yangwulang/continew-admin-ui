@@ -54,3 +54,12 @@ export const getUserInfo = () => {
 export const getUserRoute = () => {
   return http.get<T.RouteItem[]>(`${BASE_URL}/user/route`)
 }
+
+/** @desc 用户注册 */
+export function register(req: T.RegisterReq, tenantCode?: string) {
+  const headers: Record<string, string> = {}
+  if (tenantCode) {
+    headers['X-Tenant-Code'] = tenantCode
+  }
+  return http.post(`${BASE_URL}/register`, req, { headers })
+}

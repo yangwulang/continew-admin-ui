@@ -88,3 +88,13 @@ export interface LoginResp {
 export interface SocialAuthAuthorizeResp {
   authorizeUrl: string
 }
+
+/** 用户注册请求参数 */
+export interface RegisterReq {
+  username: string
+  password: string
+  nickname: string
+  phone: string
+  captcha: string
+  uuid: string
+}
