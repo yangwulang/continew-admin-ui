@@ -43,6 +43,12 @@ export const systemRoutes: RouteRecordRaw[] = [
     meta: { hidden: true },
   },
   {
+    path: '/finance/sign/billing',
+    name: 'BillingSign',
+    component: () => import('@/views/finance/sign/index.vue'),
+    meta: { hidden: true, title: '账单签名' },
+  },
+  {
     path: '/user',
     name: 'User',
     component: Layout,

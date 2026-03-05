@@ -70,7 +70,7 @@ const compareTag = async () => {
 }
 
 /** 免登录白名单 */
-const whiteList = ['/login', '/social/callback', '/pwdExpired']
+const whiteList = ['/login', '/social/callback', '/pwdExpired', '/finance/sign/billing']
 
 /** 是否已经生成过路由表 */
 let hasRouteFlag = false

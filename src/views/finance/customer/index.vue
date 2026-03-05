@@ -20,10 +20,10 @@
         </a-button>
       </template>
       <template #toolbar-right>
-        <a-button v-permission="['finance:fin-customer:create']" type="primary" @click="onAdd">
+        <!-- <a-button v-permission="['finance:fin-customer:create']" type="primary" @click="onAdd">
           <template #icon><icon-plus /></template>
           <template #default>新增</template>
-        </a-button>
+        </a-button> -->
       </template>
       <template #enablePrepaid="{ record }">
         <a-tag v-if="record.enablePrepaid" color="green" size="small">是</a-tag>
@@ -115,9 +115,9 @@ const onDelete = (record: FinCustomerResp) => {
 
 const AddModalRef = ref<InstanceType<typeof AddModal>>()
 // 新增
-const onAdd = () => {
-  AddModalRef.value?.onAdd()
-}
+// const onAdd = () => {
+//   AddModalRef.value?.onAdd()
+// }
 // 修改
 const onUpdate = (record: FinCustomerResp) => {
   AddModalRef.value?.onUpdate(record.id)
