@@ -1,4 +1,5 @@
 import http from '@/utils/http'
+import type { LabelValueState } from '@/types/global'
 
 const BASE_URL = '/finance/fin-customer'
 
@@ -9,10 +10,12 @@ export interface FinCustomerResp {
   nickname: string
   phone: string
   email: string
+  deptId?: string
   enablePrepaid: boolean
   allowNegativeBalance: boolean
   remark: string
   createTime: string
+  balance?: number
 }
 
 export interface FinCustomerDetailResp extends FinCustomerResp {}
@@ -49,4 +52,9 @@ export function updateFinCustomer(data: Partial<FinCustomerCreateReq>, id: strin
 
 export function deleteFinCustomer(id: string) {
   return http.del(BASE_URL, { ids: [id] })
+}
+
+/** @desc 查询客户字典 */
+export function listFinCustomerDict() {
+  return http.get<LabelValueState[]>(`${BASE_URL}/dict`)
 }

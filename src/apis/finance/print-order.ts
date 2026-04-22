@@ -8,11 +8,18 @@ export interface PrintOrderResp {
   id: string
   orderNo: string
   customerId: number
+  customerName?: string
   totalAmount: number
   status: string
   billingRecordId?: number
   remark?: string
   createTime?: string
+  // 支付相关字段
+  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID'
+  balancePaid: number
+  thirdPartyPaid: number
+  payChannel?: string
+  expireTime?: string
 }
 
 export interface PrintOrderDetailResp extends PrintOrderResp {
@@ -74,6 +81,7 @@ export interface PrintPriceItemReq {
 }
 
 export interface PrintPriceCalculateReq {
+  customerId?: number
   items: Array<PrintPriceItemReq>
 }
 
@@ -108,6 +116,28 @@ export interface PrintFileUploadResp {
   pageCount: number
 }
 
+// ===== 创建订单响应 =====
+
+export interface PrintOrderCreateResp {
+  orderId: string
+  orderNo: string
+  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID'
+  totalAmount: number
+  balancePaid: number
+  remainAmount: number
+}
+
+// ===== 三方支付响应 =====
+
+export interface PrintPaymentInitResp {
+  qrCodeUrl: string
+  payUrl: string
+  outTradeNo: string
+  amount: number
+  expireTime: string
+  channel: string
+}
+
 // ===== 创建订单（多文件） =====
 
 export interface PrintOrderItemCreateReq {
@@ -124,6 +154,47 @@ export interface PrintOrderCreateReq {
   remark?: string
 }
 
+// ===== 聚合详情类型 =====
+
+export interface PrintOrderOptionDetail {
+  id: string
+  attributeName: string
+  optionName: string
+  priceMode: string
+  price: number
+  calculatedAmount: number
+}
+
+export interface PrintOrderItemWithOptions {
+  id: string
+  fileUrl: string
+  fileName: string
+  pageCount: number
+  copies: number
+  subtotalAmount: number
+  sort: number
+  options: PrintOrderOptionDetail[]
+}
+
+export interface PrintOrderFullDetailResp {
+  id: string
+  orderNo: string
+  customerId: number
+  customerName?: string
+  totalAmount: number
+  status: string
+  billingRecordId?: number
+  remark?: string
+  createTime?: string
+  updateTime?: string
+  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID'
+  balancePaid: number
+  thirdPartyPaid: number
+  payChannel?: string
+  expireTime?: string
+  items: PrintOrderItemWithOptions[]
+}
+
 // ===== API 函数 =====
 
 export function listPrintOrder(query: PrintOrderPageQuery) {
@@ -132,6 +203,10 @@ export function listPrintOrder(query: PrintOrderPageQuery) {
 
 export function getPrintOrder(id: string) {
   return http.get<PrintOrderDetailResp>(`${BASE_URL}/${id}`)
+}
+
+export function getPrintOrderFullDetail(id: string) {
+  return http.get<PrintOrderFullDetailResp>(`${BASE_URL}/${id}/detail`)
 }
 
 export function deletePrintOrder(ids: Array<string>) {
@@ -152,7 +227,17 @@ export function calculatePrintPrice(data: PrintPriceCalculateReq) {
 
 /** 创建打印订单（多文件） */
 export function createPrintOrder(data: PrintOrderCreateReq) {
-  return http.post<number>(`${BASE_URL}/create`, data)
+  return http.post<PrintOrderCreateResp>(`${BASE_URL}/create`, data)
+}
+
+/** 发起三方支付 */
+export function initiatePayment(id: string, channel: string) {
+  return http.post<PrintPaymentInitResp>(`${BASE_URL}/${id}/initiate-payment`, {}, { params: { channel } })
+}
+
+/** 轮询支付状态 */
+export function queryPaymentStatus(id: string) {
+  return http.get<string>(`${BASE_URL}/${id}/payment-status`)
 }
 
 /** 获取所有启用的打印属性和选项 */

@@ -11,7 +11,7 @@
   >
     <a-form ref="formRef" :model="form" layout="vertical">
       <a-row :gutter="16">
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item field="customerId" label="选择客户" :rules="[{ required: true, message: '请选择客户' }]">
             <a-select
               v-model="form.customerId"
@@ -20,12 +20,18 @@
               allow-clear
               :loading="customerLoading"
               @search="onCustomerSearch"
+              @change="onCustomerChange"
             >
               <a-option v-for="c in customerList" :key="c.id" :value="c.id" :label="c.username" />
             </a-select>
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
+          <a-form-item label="所属部门">
+            <a-input :model-value="selectedDeptName" placeholder="选择客户后自动填充" readonly />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
           <a-form-item field="billingDate" label="记账日期" :rules="[{ required: true, message: '请选择记账日期' }]">
             <a-date-picker v-model="form.billingDate" format="YYYY-MM-DD" style="width: 100%" />
           </a-form-item>
@@ -99,8 +105,11 @@
 import { Message } from '@arco-design/web-vue'
 import { useWindowSize } from '@vueuse/core'
 import { addFinBillingRecordWithItems } from '@/apis/finance/fin-billing-record'
-import { listFinCustomer, type FinCustomerResp } from '@/apis/finance/fin-customer'
-import { listFinMaterial, type FinMaterialResp } from '@/apis/finance/fin-material'
+import { type FinCustomerResp, listFinCustomer } from '@/apis/finance/fin-customer'
+import { type FinCustomerMaterialPriceResp, listFinCustomerMaterialPrice } from '@/apis/finance/fin-customer-material-price'
+import { type FinDeptMaterialPriceResp, listFinDeptMaterialPrice } from '@/apis/finance/fin-dept-material-price'
+import { type FinMaterialResp, listFinMaterial } from '@/apis/finance/fin-material'
+import { useDept } from '@/hooks/app'
 
 const emit = defineEmits<{
   (e: 'save-success'): void
@@ -120,6 +129,7 @@ interface ItemRow {
 
 const form = reactive({
   customerId: undefined as string | undefined,
+  deptId: undefined as string | undefined,
   billingDate: undefined as string | undefined,
   items: [] as ItemRow[],
 })
@@ -140,6 +150,26 @@ const onCustomerSearch = (keyword: string) => {
   loadCustomers(keyword)
 }
 
+// ===== 部门名称显示 =====
+const { deptList, getDeptList } = useDept()
+
+// 从部门树中递归查找部门名称
+const findDeptName = (list: any[], deptId: string): string => {
+  for (const item of list) {
+    if (String(item.key) === String(deptId)) return item.title || ''
+    if (item.children) {
+      const name = findDeptName(item.children, deptId)
+      if (name) return name
+    }
+  }
+  return ''
+}
+
+const selectedDeptName = computed(() => {
+  if (!form.deptId) return ''
+  return findDeptName(deptList.value, form.deptId)
+})
+
 // ===== 物料列表 =====
 const materialList = ref<FinMaterialResp[]>([])
 const materialLoading = ref(false)
@@ -152,6 +182,116 @@ const loadMaterials = async () => {
     materialLoading.value = false
   }
 }
+
+// ===== 客户物料价格缓存 =====
+const customerPriceMap = ref<Record<string, FinCustomerMaterialPriceResp[]>>({})
+const loadCustomerPrices = async (customerId: string) => {
+  if (customerPriceMap.value[customerId]) return
+  const { data } = await listFinCustomerMaterialPrice({ customerId, sort: ['id,desc'], page: 1, size: 500 })
+  customerPriceMap.value[customerId] = data?.list || []
+}
+
+// 获取客户对某物料的专属价格
+const getCustomerPrice = (customerId: string | undefined, materialId: string): number | undefined => {
+  if (!customerId) return undefined
+  const prices = customerPriceMap.value[customerId]
+  if (!prices) return undefined
+  const now = new Date().toISOString()
+  const price = prices.find((p) => {
+    if (String(p.materialId) !== String(materialId)) return false
+    if (p.effectiveFrom && now < p.effectiveFrom) return false
+    if (p.effectiveTo && now > p.effectiveTo) return false
+    return true
+  })
+  return price?.unitPrice
+}
+
+// ===== 部门物料价格缓存 =====
+const deptPriceMap = ref<Record<string, FinDeptMaterialPriceResp[]>>({})
+const loadDeptPrices = async (deptId: string) => {
+  if (deptPriceMap.value[deptId]) return
+  const { data } = await listFinDeptMaterialPrice({ deptId, sort: ['id,desc'], page: 1, size: 500 })
+  deptPriceMap.value[deptId] = data?.list || []
+}
+
+// 获取部门对某物料的专属价格
+const getDeptPrice = (deptId: string | undefined, materialId: string): number | undefined => {
+  if (!deptId) return undefined
+  const prices = deptPriceMap.value[deptId]
+  if (!prices) return undefined
+  const now = new Date().toISOString()
+  const price = prices.find((p) => {
+    if (String(p.materialId) !== String(materialId)) return false
+    if (p.effectiveFrom && now < p.effectiveFrom) return false
+    if (p.effectiveTo && now > p.effectiveTo) return false
+    return true
+  })
+  return price?.unitPrice
+}
+
+// 刷新明细行价格（优先客户专属价 -> 部门专属价 -> 物料基础价）
+const calcItemAmount = (item: ItemRow) => {
+  const price = item.unitPrice || 0
+  const qty = item.quantity || 0
+  item.amount = price * qty
+}
+
+const refreshItemPrice = (item: ItemRow) => {
+  const mat = materialList.value.find((m) => m.id === item.materialId)
+  // 1. 优先客户专属价
+  const customerPrice = getCustomerPrice(form.customerId, item.materialId!)
+  if (customerPrice !== undefined) {
+    item.unitPrice = customerPrice
+  } else {
+    // 2. 其次部门专属价
+    const deptPrice = getDeptPrice(form.deptId, item.materialId!)
+    if (deptPrice !== undefined) {
+      item.unitPrice = deptPrice
+    } else if (mat) {
+      // 3. 最后物料基础价
+      item.unitPrice = mat.defaultUnitPrice
+    }
+  }
+  calcItemAmount(item)
+}
+
+// 选择客户后，自动读取客户的部门
+const onCustomerChange = (val: string) => {
+  if (val) {
+    const customer = customerList.value.find((c) => String(c.id) === String(val))
+    form.deptId = customer?.deptId || undefined
+    loadCustomerPrices(val)
+    if (form.deptId) {
+      loadDeptPrices(form.deptId)
+    }
+  } else {
+    form.deptId = undefined
+  }
+  form.items.forEach((item) => {
+    if (item.materialId) {
+      refreshItemPrice(item)
+    }
+  })
+}
+
+// 监听客户切换（外部触发时也需同步部门）
+watch(() => form.customerId, (newVal) => {
+  if (newVal) {
+    const customer = customerList.value.find((c) => String(c.id) === String(newVal))
+    form.deptId = customer?.deptId || undefined
+    loadCustomerPrices(newVal)
+    if (form.deptId) {
+      loadDeptPrices(form.deptId)
+    }
+  } else {
+    form.deptId = undefined
+  }
+  form.items.forEach((item) => {
+    if (item.materialId) {
+      refreshItemPrice(item)
+    }
+  })
+})
 
 // ===== 明细行操作 =====
 const addItem = () => {
@@ -171,18 +311,11 @@ const removeItem = (index: number) => {
 const onMaterialChange = (rowIndex: number) => {
   const item = form.items[rowIndex]
   if (item.materialId) {
-    const mat = materialList.value.find((m) => m.id === item.materialId)
-    if (mat && !item.unitPrice) {
-      item.unitPrice = mat.defaultUnitPrice
-    }
+    refreshItemPrice(item)
+  } else {
+    item.unitPrice = undefined
+    calcItemAmount(item)
   }
-  calcItemAmount(item)
-}
-
-const calcItemAmount = (item: ItemRow) => {
-  const price = item.unitPrice || 0
-  const qty = item.quantity || 0
-  item.amount = price * qty
 }
 
 const totalAmount = computed(() => {
@@ -211,6 +344,7 @@ const save = async () => {
     }
     await addFinBillingRecordWithItems({
       customerId: form.customerId!,
+      deptId: form.deptId || undefined,
       billingDate: form.billingDate!,
       items: form.items.map((it) => ({
         materialId: it.materialId!,
@@ -230,6 +364,7 @@ const save = async () => {
 // ===== 重置 =====
 const reset = () => {
   form.customerId = undefined
+  form.deptId = undefined
   form.billingDate = undefined
   form.items = []
 }
@@ -238,7 +373,7 @@ const reset = () => {
 const onAdd = async () => {
   reset()
   visible.value = true
-  await Promise.all([loadCustomers(), loadMaterials()])
+  await Promise.all([loadCustomers(), loadMaterials(), getDeptList()])
   addItem()
 }
 

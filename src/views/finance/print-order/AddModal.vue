@@ -11,6 +11,25 @@
     @close="resetForm"
   >
     <a-form ref="formRef" :model="form" layout="vertical">
+      <!-- 余额提示：在客户选择器下方显示 -->
+      <a-alert v-if="customerBalance !== null" type="info" style="margin-bottom: 16px">
+        <template #message>
+          客户余额: <strong>¥{{ customerBalance.toFixed(2) }}</strong>
+          <template v-if="priceResult && priceResult.totalAmount > 0">
+            &nbsp;|&nbsp;订单金额: <strong>¥{{ priceResult.totalAmount.toFixed(2) }}</strong>
+            <template v-if="priceResult.totalAmount > customerBalance">
+              &nbsp;|&nbsp;预计需三方支付: <strong style="color: #f53f3f">¥{{ (priceResult.totalAmount - customerBalance).toFixed(2) }}</strong>
+            </template>
+            <template v-else>
+              &nbsp;|&nbsp;<span style="color: #00b42a">余额足够，可直接全额扮款</span>
+            </template>
+          </template>
+          <template v-if="hasCustomPrice()">
+            &nbsp;|&nbsp;<span style="color: #ff7d00">已应用客户/部门专属价格</span>
+          </template>
+        </template>
+      </a-alert>
+
       <!-- 选择客户 -->
       <a-form-item label="选择客户" field="customerId" :rules="[{ required: true, message: '请选择客户' }]">
         <a-select
@@ -21,7 +40,7 @@
           :loading="customerLoading"
           @search="searchCustomer"
         >
-          <a-option v-for="c in customerList" :key="c.id" :value="Number(c.id)">
+          <a-option v-for="c in customerList" :key="c.id" :value="c.id">
             {{ c.nickname || c.username }} ({{ c.phone }})
           </a-option>
         </a-select>
@@ -70,7 +89,7 @@
                   </template>
                 </a-upload>
                 <a-space v-if="uploadLoadings[idx]">
-                  <a-spin size="16" />
+                  <a-spin :size="16" />
                   <span style="color: var(--color-text-3); font-size: 12px">上传并检测页数...</span>
                 </a-space>
                 <a-tag v-if="item.pageCount > 0" color="green" size="small">{{ item.pageCount }} 页</a-tag>
@@ -90,7 +109,7 @@
             <a-col v-for="attr in attributes" :key="attr.id" :span="12" style="margin-bottom: 4px">
               <a-form-item
                 :label="attr.name"
-                :field="`itemOptions.${idx}.${attr.id}`"
+                :field="`opt.${idx}.${attr.id}`"
                 :rules="attr.isRequired ? [{ required: true, message: `请选择${attr.name}` }] : undefined"
                 style="margin-bottom: 8px"
               >
@@ -171,14 +190,29 @@
       </a-form-item>
     </a-form>
   </a-modal>
+
+  <!-- 支付弹窗 -->
+  <PaymentModal
+    v-if="paymentInfo"
+    ref="PaymentModalRef"
+    :order-id="paymentInfo.orderId"
+    :order-no="paymentInfo.orderNo"
+    :total-amount="paymentInfo.totalAmount"
+    :balance-paid="paymentInfo.balancePaid"
+    :remain-amount="paymentInfo.remainAmount"
+    @paid="onPaymentDone"
+    @closed="onPaymentClosed"
+  />
 </template>
 
 <script setup lang="ts">
 import { Message } from '@arco-design/web-vue'
 import type { FileItem } from '@arco-design/web-vue'
+import PaymentModal from './PaymentModal.vue'
 import {
   type ItemPriceResult,
   type PrintAttributeWithOptions,
+  type PrintOrderCreateResp,
   type PrintPriceCalculateResp,
   calculatePrintPrice,
   createPrintOrder,
@@ -205,10 +239,25 @@ const visible = ref(false)
 const submitting = ref(false)
 const formRef = ref()
 
+// 支付弹窗相关
+const PaymentModalRef = ref<InstanceType<typeof PaymentModal>>()
+interface PaymentInfo {
+  orderId: string
+  orderNo: string
+  totalAmount: number
+  balancePaid: number
+  remainAmount: number
+}
+const paymentInfo = ref<PaymentInfo | null>(null)
+
+// 客户余额
+const customerBalance = ref<number | null>(null)
+
 const form = reactive({
-  customerId: undefined as number | undefined,
+  customerId: undefined as string | undefined,
   items: [] as FormItem[],
   remark: '',
+  opt: {} as Record<number, Record<number, number | number[]>>,
 })
 
 // 每个文件项的上传状态和文件列表
@@ -232,6 +281,16 @@ const searchCustomer = async (keyword: string) => {
   }
 }
 
+// 客户选择变化时更新余额（价格重算在 onOptionChange 定义后注册）
+watch(() => form.customerId, (id) => {
+  if (!id) {
+    customerBalance.value = null
+    return
+  }
+  const found = customerList.value.find((c) => c.id === id)
+  customerBalance.value = found?.balance ?? null
+})
+
 // 打印属性
 const attributes = ref<PrintAttributeWithOptions[]>([])
 const attrLoading = ref(false)
@@ -240,6 +299,10 @@ const attrLoading = ref(false)
 const priceResult = ref<PrintPriceCalculateResp | null>(null)
 const priceLoading = ref(false)
 let priceTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(() => itemOptions, () => {
+  form.opt = itemOptions
+}, { deep: true })
 
 // 获取某项的选项 ID 列表
 const getItemOptionIds = (idx: number): number[] => {
@@ -283,7 +346,10 @@ const doCalculatePrice = async () => {
   }
   priceLoading.value = true
   try {
-    const { data } = await calculatePrintPrice({ items })
+    const { data } = await calculatePrintPrice({
+      customerId: form.customerId ? Number(form.customerId) : undefined,
+      items,
+    })
     priceResult.value = data
   } catch {
     priceResult.value = null
@@ -295,6 +361,24 @@ const doCalculatePrice = async () => {
 const onOptionChange = () => {
   if (priceTimer) clearTimeout(priceTimer)
   priceTimer = setTimeout(doCalculatePrice, 300)
+}
+
+// 客户切换后也需重新计算价格（专属价格可能不同）
+watch(() => form.customerId, () => {
+  onOptionChange()
+})
+
+// 判断是否有客户/部门专属价格生效
+const hasCustomPrice = () => {
+  if (!priceResult.value || !form.customerId) return false
+  for (const item of priceResult.value.items) {
+    for (const detail of item.details) {
+      // 查找选项基础价格进行对比
+      const opt = attributes.value.flatMap((a) => a.options).find((o) => o.name === detail.optionName)
+      if (opt && opt.price !== detail.price) return true
+    }
+  }
+  return false
 }
 
 const addItem = () => {
@@ -398,13 +482,31 @@ const handleSubmit = async () => {
       optionIds: getItemOptionIds(idx),
     }))
 
-    await createPrintOrder({
-      customerId: form.customerId!,
+    const { data: createResp } = await createPrintOrder({
+      customerId: form.customerId! as unknown as number,
       items,
       remark: form.remark,
     })
-    Message.success('打印订单创建成功')
-    emit('save-success')
+
+    if (createResp.paymentStatus === 'PAID') {
+      // 余额全额扮款，直接成功
+      Message.success('订单创建成功，余额已全额扮款')
+      emit('save-success')
+      return true
+    }
+
+    // 需要三方支付 (UNPAID / PARTIAL)
+    paymentInfo.value = {
+      orderId: createResp.orderId,
+      orderNo: createResp.orderNo,
+      totalAmount: createResp.totalAmount,
+      balancePaid: createResp.balancePaid,
+      remainAmount: createResp.remainAmount,
+    }
+    // 关闭下单弹窗，弹出支付弹窗
+    visible.value = false
+    await nextTick()
+    PaymentModalRef.value?.onOpen()
     return true
   } catch (e: any) {
     Message.error(e?.msg || '创建订单失败')
@@ -412,6 +514,18 @@ const handleSubmit = async () => {
   } finally {
     submitting.value = false
   }
+}
+
+// 支付成功回调
+const onPaymentDone = () => {
+  paymentInfo.value = null
+  emit('save-success')
+}
+
+// 支付弹窗关闭（未支付，订单已以 UNPAID 状态保存）
+const onPaymentClosed = () => {
+  paymentInfo.value = null
+  emit('save-success')
 }
 
 const resetForm = () => {
@@ -423,6 +537,8 @@ const resetForm = () => {
   Object.keys(uploadLoadings).forEach((k) => delete uploadLoadings[Number(k)])
   Object.keys(itemOptions).forEach((k) => delete itemOptions[Number(k)])
   priceResult.value = null
+  paymentInfo.value = null
+  customerBalance.value = null
 }
 
 const onOpen = async () => {

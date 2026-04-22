@@ -5,6 +5,9 @@ const BASE_URL = '/finance/fin-billing-record'
 export interface FinBillingRecordResp {
   id: string
   customerId: string
+  customerName?: string
+  deptId?: string
+  deptName?: string
   billingDate: string
   totalAmount: number
   status: string
@@ -22,6 +25,7 @@ export interface FinBillingRecordDetailResp extends FinBillingRecordResp {
 
 export interface FinBillingRecordQuery {
   customerId?: string
+  deptId?: number
   status?: string
   sort: Array<string>
 }
@@ -37,6 +41,7 @@ export interface FinBillingCreateItemReq {
 
 export interface FinBillingCreateReq {
   customerId: string
+  deptId?: string
   billingDate: string
   items: FinBillingCreateItemReq[]
 }

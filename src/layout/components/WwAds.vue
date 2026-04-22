@@ -8,14 +8,15 @@ onMounted(() => {
   const s = document.createElement('script')
   s.async = true
   s.src = `https://cdn.wwads.cn/js/makemoney.js`
-  document.querySelector('.wwads-container')!.appendChild(s)
+  // document.querySelector('.wwads-container')!.appendChild(s)
 })
 </script>
 
 <template>
-  <div v-show="!appStore.menuCollapse" class="wwads-container">
+  <!-- <div v-show="!appStore.menuCollapse" class="wwads-container">
     <div class="wwads-cn wwads-vertical" data-id="359" style="max-width: 180px"></div>
-  </div>
+  </div> -->
+  <div></div>
 </template>
 
 <style>

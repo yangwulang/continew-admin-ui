@@ -11,7 +11,7 @@
     >
       <Logo :collapsed="appStore.menuCollapse" />
       <Menu :menus="twoLevelMenus" :menu-style="{ flex: 1 }" />
-      <WwAds class="ads" />
+      <!-- <WwAds class="ads" /> -->
     </section>
 
     <!-- 右侧内容区域 -->

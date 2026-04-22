@@ -1,5 +1,8 @@
 <template>
   <GiPageLayout>
+    <template #left>
+      <DeptTree @node-click="handleSelectDept" />
+    </template>
     <GiTable
       title="记账管理"
       row-key="id"
@@ -80,7 +83,7 @@
     <DetailDrawer ref="DetailDrawerRef" />
 
     <!-- 签名链接弹窗 -->
-    <a-modal v-model:visible="signLinkVisible" title="签名链接" :width="500" ok-text="关闭" :cancel-button-props="{ style: { display: 'none' } }">
+    <a-modal v-model:visible="signLinkVisible" title="签名链接" :width="500" ok-text="关闭" >
       <a-space direction="vertical" fill style="width: 100%">
         <a-alert type="info">请复制以下链接发送给客户进行签名</a-alert>
         <a-textarea :model-value="signLinkUrl" :auto-size="{ minRows: 2 }" readonly />
@@ -121,14 +124,15 @@
 <script setup lang="ts">
 import { Message } from '@arco-design/web-vue'
 import type { TableInstance } from '@arco-design/web-vue'
+import DeptTree from './dept/index.vue'
 import AddModal from './AddModal.vue'
 import DetailDrawer from './DetailDrawer.vue'
 import {
-  type FinBillingRecordResp,
   type FinBillingRecordQuery,
-  listFinBillingRecord,
-  generateFinBillingSignLink,
+  type FinBillingRecordResp,
   approveFinBillingRecord,
+  generateFinBillingSignLink,
+  listFinBillingRecord,
 } from '@/apis/finance/fin-billing-record'
 import { useTable } from '@/hooks'
 import { isMobile } from '@/utils'
@@ -169,7 +173,8 @@ const {
 
 const columns: TableInstance['columns'] = [
   { title: '记账日期', dataIndex: 'billingDate', width: 120 },
-  { title: '客户ID', dataIndex: 'customerId', width: 100 },
+  { title: '客户名称', dataIndex: 'customerName', width: 150 },
+  { title: '部门', dataIndex: 'deptName', width: 120 },
   { title: '总金额', dataIndex: 'totalAmount', slotName: 'totalAmount', width: 120, align: 'right' },
   { title: '状态', dataIndex: 'status', slotName: 'status', width: 100, align: 'center' },
   { title: '签名时间', dataIndex: 'signedAt', width: 180, show: false },
@@ -189,6 +194,13 @@ const columns: TableInstance['columns'] = [
 // 重置
 const reset = () => {
   queryForm.status = undefined
+  queryForm.deptId = undefined
+  search()
+}
+
+// 根据选中部门查询
+const handleSelectDept = (keys: Array<any>) => {
+  queryForm.deptId = keys.length === 1 ? keys[0] : undefined
   search()
 }
 

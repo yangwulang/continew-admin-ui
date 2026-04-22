@@ -56,6 +56,7 @@ export function useLevelMenu() {
 
   // 菜单点击事件
   function handleMenuItemClickByItem(item: RouteRecordRaw) {
+    console.log(item)
     let path = (item.redirect as string) || item.path
     if ((!item.redirect && item?.children?.length) || (item.redirect === 'noRedirect' && item?.children?.length)) {
       path = item.children?.[0]?.path

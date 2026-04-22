@@ -115,12 +115,8 @@ const getCategoryList = async () => {
     categoryList.value = data || []
     nextTick(() => {
       treeRef.value?.expandAll(true)
-      if (categoryList.value.length > 0) {
-        select([categoryList.value[0]?.id])
-      } else {
-        // 如果没有分类，触发查询全部
-        emit('node-click', [])
-      }
+      // 不默认选中，触发查询全部
+      emit('node-click', [])
     })
   } finally {
     loading.value = false
@@ -338,7 +334,13 @@ onMounted(() => {
   getCategoryList()
 })
 
-defineExpose({ getCategoryList })
+/** 清除选中状态 */
+const clearSelection = () => {
+  selectedKeys.value = []
+  emit('node-click', [])
+}
+
+defineExpose({ getCategoryList, clearSelection })
 </script>
 
 <style scoped lang="scss">

@@ -19,6 +19,7 @@ export interface FinMaterialDetailResp extends FinMaterialResp {}
 
 export interface FinMaterialQuery {
   categoryId?: string
+  categoryIds?: string[]
   name?: string
   status?: number
   sort: Array<string>

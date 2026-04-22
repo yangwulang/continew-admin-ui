@@ -1,61 +1,77 @@
 <template>
   <a-drawer v-model:visible="visible" title="打印订单详情" :width="width >= 700 ? 700 : '100%'" :footer="false">
-    <a-descriptions :column="2" size="large" class="general-description">
-      <a-descriptions-item label="订单编号">{{ dataDetail?.orderNo }}</a-descriptions-item>
-      <a-descriptions-item label="客户 ID">{{ dataDetail?.customerId }}</a-descriptions-item>
-      <a-descriptions-item label="总金额" :span="2">
-        <span style="font-weight: 600; color: #f53f3f; font-size: 16px">{{ dataDetail?.totalAmount?.toFixed(2) }} 元</span>
-      </a-descriptions-item>
-      <a-descriptions-item label="状态">
-        <a-tag :color="statusColorMap[dataDetail?.status || ''] || 'gray'" size="small">
-          {{ statusLabelMap[dataDetail?.status || ''] || dataDetail?.status }}
-        </a-tag>
-      </a-descriptions-item>
-      <a-descriptions-item label="关联记账 ID">{{ dataDetail?.billingRecordId || '暂无' }}</a-descriptions-item>
-      <a-descriptions-item label="创建时间">{{ dataDetail?.createTime }}</a-descriptions-item>
-      <a-descriptions-item label="备注" :span="2">{{ dataDetail?.remark || '暂无' }}</a-descriptions-item>
-    </a-descriptions>
+    <a-spin :loading="loading" style="width: 100%">
+      <template v-if="detail">
+        <!-- 订单基本信息 -->
+        <a-descriptions :column="2" size="large" class="general-description">
+          <a-descriptions-item label="订单编号" :span="2">{{ detail.orderNo }}</a-descriptions-item>
+          <a-descriptions-item label="客户名称">{{ detail?.customerName || detail?.customerId }}</a-descriptions-item>
+          <a-descriptions-item label="总金额">
+            <span style="font-weight: 600; color: #f53f3f; font-size: 16px">{{ detail.totalAmount?.toFixed(2) }} 元</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="状态">
+            <a-tag :color="statusColorMap[detail.status] || 'gray'" size="small">
+              {{ statusLabelMap[detail.status] || detail.status }}
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="关联记账 ID">{{ detail.billingRecordId || '暂无' }}</a-descriptions-item>
+          <a-descriptions-item label="创建时间">{{ detail.createTime }}</a-descriptions-item>
+          <a-descriptions-item label="备注" :span="2">{{ detail.remark || '暂无' }}</a-descriptions-item>
+        </a-descriptions>
 
-    <!-- 文件项列表 -->
-    <a-divider orientation="left">打印文件明细</a-divider>
-    <a-spin :loading="itemLoading">
-      <a-empty v-if="itemList.length === 0" description="暂无文件项" />
-      <template v-else>
-        <a-card v-for="(item, idx) in itemList" :key="item.id" style="margin-bottom: 12px" :body-style="{ padding: '12px' }">
-          <template #title>
-            <span>文件 {{ idx + 1 }} - {{ item.fileName }}</span>
-          </template>
-          <div style="margin-bottom: 8px">
-            <a-space>
-              <a-tag color="blue">{{ item.pageCount }} 页</a-tag>
-              <a-tag color="green">{{ item.copies }} 份</a-tag>
-              <a-tag color="arcoblue">小计：{{ item.subtotalAmount?.toFixed(2) }} 元</a-tag>
-            </a-space>
-          </div>
-          <!-- 该文件项的选项 -->
-          <a-table
-            :data="getOptionListByItemId(item.id)"
-            :pagination="false"
-            size="small"
-            :show-header="true"
+        <!-- 支付信息 -->
+        <a-divider orientation="left">支付信息</a-divider>
+        <a-descriptions :column="2" size="medium" class="general-description">
+          <a-descriptions-item label="支付状态">
+            <a-tag :color="paymentColorMap[detail.paymentStatus] || 'gray'" size="small">
+              {{ paymentLabelMap[detail.paymentStatus] || detail.paymentStatus }}
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="支付渠道">{{ detail.payChannel || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="余额已付">¥ {{ (detail.balancePaid ?? 0).toFixed(2) }}</a-descriptions-item>
+          <a-descriptions-item label="三方已付">¥ {{ (detail.thirdPartyPaid ?? 0).toFixed(2) }}</a-descriptions-item>
+          <a-descriptions-item v-if="detail.expireTime" label="支付过期时间" :span="2">{{ detail.expireTime }}</a-descriptions-item>
+        </a-descriptions>
+
+        <!-- 文件项列表 -->
+        <a-divider orientation="left">打印文件明细</a-divider>
+        <a-empty v-if="!detail.items || detail.items.length === 0" description="暂无文件项" />
+        <template v-else>
+          <a-card
+            v-for="(item, idx) in detail.items"
+            :key="item.id"
+            style="margin-bottom: 12px"
+            :body-style="{ padding: '12px' }"
           >
-            <template #columns>
-              <a-table-column title="属性" data-index="attributeName" :width="120" />
-              <a-table-column title="选项" data-index="optionName" :width="120" />
-              <a-table-column title="计价方式" data-index="priceMode" :width="100" align="center">
-                <template #cell="{ record }">
-                  <a-tag size="small" :color="priceModeColor[record.priceMode]">{{ priceModeLabel[record.priceMode] }}</a-tag>
-                </template>
-              </a-table-column>
-              <a-table-column title="单价/值" data-index="price" :width="100" align="right" />
-              <a-table-column title="计算金额" data-index="calculatedAmount" :width="120" align="right">
-                <template #cell="{ record }">
-                  <span style="font-weight: 600">{{ record.calculatedAmount?.toFixed(2) }}</span>
-                </template>
-              </a-table-column>
+            <template #title>
+              <span>文件 {{ idx + 1 }} - {{ item.fileName }}</span>
             </template>
-          </a-table>
-        </a-card>
+            <div style="margin-bottom: 8px">
+              <a-space>
+                <a-tag color="blue">{{ item.pageCount }} 页</a-tag>
+                <a-tag color="green">{{ item.copies }} 份</a-tag>
+                <a-tag color="arcoblue">小计：{{ item.subtotalAmount?.toFixed(2) }} 元</a-tag>
+              </a-space>
+            </div>
+            <a-table :data="item.options" :pagination="false" size="small" :show-header="true">
+              <template #columns>
+                <a-table-column title="属性" data-index="attributeName" :width="120" />
+                <a-table-column title="选项" data-index="optionName" :width="120" />
+                <a-table-column title="计价方式" data-index="priceMode" :width="100">
+                  <template #cell="{ record }">
+                    <a-tag size="small" :color="priceModeColor[record.priceMode]">{{ priceModeLabel[record.priceMode] }}</a-tag>
+                  </template>
+                </a-table-column>
+                <a-table-column title="单价/值" data-index="price" :width="100" />
+                <a-table-column title="计算金额" data-index="calculatedAmount" :width="120">
+                  <template #cell="{ record }">
+                    <span style="font-weight: 600">{{ record.calculatedAmount?.toFixed(2) }}</span>
+                  </template>
+                </a-table-column>
+              </template>
+            </a-table>
+          </a-card>
+        </template>
       </template>
     </a-spin>
   </a-drawer>
@@ -63,7 +79,7 @@
 
 <script setup lang="ts">
 import { useWindowSize } from '@vueuse/core'
-import { type PrintOrderDetailResp, type PrintOrderItemResp, type PrintOrderOptionResp, getPrintOrder, listPrintOrderItems, listPrintOrderOptions } from '@/apis/finance/print-order'
+import { type PrintOrderFullDetailResp, getPrintOrderFullDetail } from '@/apis/finance/print-order'
 
 const { width } = useWindowSize()
 
@@ -84,47 +100,23 @@ const statusColorMap: Record<string, string> = {
   COMPLETED: 'green',
   CANCELLED: 'gray',
 }
+const paymentLabelMap: Record<string, string> = { PAID: '已支付', PARTIAL: '余额已付/待补付', UNPAID: '待支付' }
+const paymentColorMap: Record<string, string> = { PAID: 'green', PARTIAL: 'orange', UNPAID: 'red' }
 
-const dataId = ref('')
-const dataDetail = ref<PrintOrderDetailResp>()
-const itemList = ref<PrintOrderItemResp[]>([])
-const optionList = ref<PrintOrderOptionResp[]>([])
-const itemLoading = ref(false)
 const visible = ref(false)
+const loading = ref(false)
+const detail = ref<PrintOrderFullDetailResp>()
 
-// 查询详情
-const getDataDetail = async () => {
-  const { data } = await getPrintOrder(dataId.value)
-  dataDetail.value = data
-}
-
-// 查询订单项
-const getItemList = async () => {
-  itemLoading.value = true
-  try {
-    const { data } = await listPrintOrderItems({ orderId: dataId.value, sort: ['sort,asc'], page: 1, size: 200 })
-    itemList.value = data.list || []
-  } finally {
-    itemLoading.value = false
-  }
-}
-
-// 查询所有选项（一次性加载）
-const getOptionList = async () => {
-  const { data } = await listPrintOrderOptions({ itemId: '', sort: ['id,asc'], page: 1, size: 2000 })
-  optionList.value = data.list || []
-}
-
-// 根据 itemId 过滤选项
-const getOptionListByItemId = (itemId: string) => {
-  return optionList.value.filter((opt) => opt.itemId === itemId)
-}
-
-// 打开
 const onOpen = async (id: string) => {
-  dataId.value = id
-  await Promise.all([getDataDetail(), getItemList(), getOptionList()])
+  detail.value = undefined
+  loading.value = true
   visible.value = true
+  try {
+    const { data } = await getPrintOrderFullDetail(id)
+    detail.value = data
+  } finally {
+    loading.value = false
+  }
 }
 
 defineExpose({ onOpen })

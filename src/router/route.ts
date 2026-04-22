@@ -94,7 +94,7 @@ export const systemRoutes: RouteRecordRaw[] = [
       {
         path: 'https://arco.design/vue/component/button',
         meta: { title: 'Arco Design文档', icon: 'arco', hidden: false },
-      },
+      } as RouteRecordRaw,
       {
         path: '/about/source',
         name: 'AboutSource',
@@ -103,15 +103,15 @@ export const systemRoutes: RouteRecordRaw[] = [
           {
             path: 'https://gitee.com/continew/continew-admin',
             meta: { title: 'Gitee', icon: 'gitee', hidden: false },
-          },
+          } as RouteRecordRaw,
           {
             path: 'https://gitcode.com/continew/continew-admin',
             meta: { title: 'GitCode', icon: 'gitcode', hidden: false },
-          },
+          } as RouteRecordRaw,
           {
             path: 'https://github.com/continew-org/continew-admin',
             meta: { title: 'GitHub', icon: 'github', hidden: false },
-          },
+          } as RouteRecordRaw,
         ],
       },
     ],

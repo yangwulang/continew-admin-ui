@@ -43,6 +43,7 @@
     "nprogress": "^0.2.0",
     "pinia": "^2.0.16",
     "pinia-plugin-persistedstate": "^3.1.0",
+    "qrcode.vue": "^3.8.1",
     "qs": "^6.11.2",
     "query-string": "^9.0.0",
     "spark-md5": "^3.0.2",

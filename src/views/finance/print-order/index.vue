@@ -40,12 +40,23 @@
       <template #status="{ record }">
         <a-tag :color="statusColorMap[record.status] || 'gray'" size="small">{{ statusLabelMap[record.status] || record.status }}</a-tag>
       </template>
+      <template #paymentStatus="{ record }">
+        <a-tag :color="paymentStatusColorMap[record.paymentStatus] || 'gray'" size="small">
+          {{ paymentStatusLabelMap[record.paymentStatus] || record.paymentStatus || '-' }}
+        </a-tag>
+      </template>
       <template #totalAmount="{ record }">
         <span style="font-weight: 600; color: #165dff">{{ record.totalAmount?.toFixed(2) }}</span>
       </template>
       <template #action="{ record }">
         <a-space>
           <a-link v-permission="['finance:fin-print-order:get']" title="详情" @click="onDetail(record)">详情</a-link>
+          <a-link
+            v-if="record.paymentStatus === 'UNPAID' || record.paymentStatus === 'PARTIAL'"
+            title="支付"
+            style="color: #f53f3f"
+            @click="onPay(record)"
+          >支付</a-link>
           <a-link
             v-if="record.status === 'PENDING'"
             v-permission="['finance:fin-print-order:delete']"
@@ -61,6 +72,18 @@
 
     <AddModal ref="AddModalRef" @save-success="search" />
     <DetailDrawer ref="DetailDrawerRef" />
+    <!-- 补付支付弹窗 -->
+    <PaymentModal
+      v-if="payingRecord"
+      ref="PayModalRef"
+      :order-id="payingRecord.id"
+      :order-no="payingRecord.orderNo"
+      :total-amount="payingRecord.totalAmount"
+      :balance-paid="payingRecord.balancePaid ?? 0"
+      :remain-amount="(payingRecord.totalAmount - (payingRecord.balancePaid ?? 0))"
+      @paid="onPayDone"
+      @closed="payingRecord = null"
+    />
   </GiPageLayout>
 </template>
 
@@ -68,6 +91,7 @@
 import type { TableInstance } from '@arco-design/web-vue'
 import AddModal from './AddModal.vue'
 import DetailDrawer from './DetailDrawer.vue'
+import PaymentModal from './PaymentModal.vue'
 import {
   type PrintOrderQuery,
   type PrintOrderResp,
@@ -94,6 +118,16 @@ const statusColorMap: Record<string, string> = {
   COMPLETED: 'green',
   CANCELLED: 'gray',
 }
+const paymentStatusLabelMap: Record<string, string> = {
+  PAID: '已支付',
+  PARTIAL: '余额已付/待补付',
+  UNPAID: '待支付',
+}
+const paymentStatusColorMap: Record<string, string> = {
+  PAID: 'green',
+  PARTIAL: 'orange',
+  UNPAID: 'red',
+}
 
 const queryForm = reactive<PrintOrderQuery>({
   status: undefined,
@@ -110,15 +144,16 @@ const {
 
 const columns: TableInstance['columns'] = [
   { title: '订单编号', dataIndex: 'orderNo', width: 220 },
-  { title: '客户 ID', dataIndex: 'customerId', width: 100 },
+  { title: '客户名称', dataIndex: 'customerName', width: 150 },
   { title: '金额', dataIndex: 'totalAmount', slotName: 'totalAmount', width: 120, align: 'right' },
-  { title: '状态', dataIndex: 'status', slotName: 'status', width: 100, align: 'center' },
+  { title: '订单状态', dataIndex: 'status', slotName: 'status', width: 100, align: 'center' },
+  { title: '支付状态', dataIndex: 'paymentStatus', slotName: 'paymentStatus', width: 130, align: 'center' },
   { title: '创建时间', dataIndex: 'createTime', width: 180 },
   {
     title: '操作',
     dataIndex: 'action',
     slotName: 'action',
-    width: 140,
+    width: 180,
     align: 'center',
     fixed: !isMobile() ? 'right' : undefined,
     show: has.hasPermOr(['finance:fin-print-order:get', 'finance:fin-print-order:delete']),
@@ -145,6 +180,19 @@ const onAdd = () => {
 const DetailDrawerRef = ref<InstanceType<typeof DetailDrawer>>()
 const onDetail = (record: PrintOrderResp) => {
   DetailDrawerRef.value?.onOpen(record.id)
+}
+
+// 支付按钮
+const PayModalRef = ref<InstanceType<typeof PaymentModal>>()
+const payingRecord = ref<PrintOrderResp | null>(null)
+const onPay = async (record: PrintOrderResp) => {
+  payingRecord.value = record
+  await nextTick()
+  PayModalRef.value?.onOpen()
+}
+const onPayDone = () => {
+  payingRecord.value = null
+  search()
 }
 </script>
 
