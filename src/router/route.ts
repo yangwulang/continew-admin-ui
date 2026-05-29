@@ -1,4 +1,5 @@
 import type { RouteRecordRaw } from 'vue-router'
+import { getToken } from '@/utils/auth'
 
 /** 默认布局 */
 const Layout = () => import('@/layout/index.vue')
@@ -13,6 +14,18 @@ export const systemRoutes: RouteRecordRaw[] = [
   },
   {
     path: '/',
+    name: 'Root',
+    redirect: () => (getToken() ? '/dashboard/workplace' : '/portal'),
+    meta: { hidden: true },
+  },
+  {
+    path: '/portal',
+    name: 'Portal',
+    component: () => import('@/views/portal/index.vue'),
+    meta: { hidden: true, title: '门户首页' },
+  },
+  {
+    path: '/dashboard',
     name: 'Dashboard',
     component: Layout,
     redirect: '/dashboard/workplace',
@@ -47,6 +60,12 @@ export const systemRoutes: RouteRecordRaw[] = [
     name: 'BillingSign',
     component: () => import('@/views/finance/sign/index.vue'),
     meta: { hidden: true, title: '账单签名' },
+  },
+  {
+    path: '/dashboard/screen',
+    name: 'DataScreen',
+    component: () => import('@/views/dashboard/screen/index.vue'),
+    meta: { hidden: true, title: '数据大屏' },
   },
   {
     path: '/user',

@@ -49,6 +49,7 @@ declare module 'vue' {
     IconTableSize: typeof import('./../components/icons/IconTableSize.vue')['default']
     IconTreeAdd: typeof import('./../components/icons/IconTreeAdd.vue')['default']
     IconTreeReduce: typeof import('./../components/icons/IconTreeReduce.vue')['default']
+    ImChat: typeof import('./../components/ImChat/index.vue')['default']
     JsonPretty: typeof import('./../components/JsonPretty/index.vue')['default']
     MinuteForm: typeof import('./../components/GenCron/CronForm/component/minute-form.vue')['default']
     MonthForm: typeof import('./../components/GenCron/CronForm/component/month-form.vue')['default']

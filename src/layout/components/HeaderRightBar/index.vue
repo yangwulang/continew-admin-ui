@@ -12,6 +12,17 @@
         </a-button>
       </a-tooltip>
 
+      <!-- 消息对话 (IM) -->
+      <a-tooltip content="消息对话" position="bl">
+        <a-button size="mini" class="gi_hover_btn" @click="ImChatRef?.open">
+          <template #icon>
+            <a-badge :count="imUnreadTotal" :max-count="99" :offset="[6, -6]">
+              <icon-message :size="18" />
+            </a-badge>
+          </template>
+        </a-button>
+      </a-tooltip>
+
       <!-- 消息通知 -->
       <a-popover
         position="bottom"
@@ -71,6 +82,7 @@
   </a-row>
 
   <SettingDrawer ref="SettingDrawerRef"></SettingDrawer>
+  <ImChat ref="ImChatRef" />
 </template>
 
 <script setup lang="ts">
@@ -80,6 +92,8 @@ import { onMounted, ref } from 'vue'
 import Message from './Message.vue'
 import SettingDrawer from './SettingDrawer.vue'
 import Search from './Search.vue'
+import ImChat from '@/components/ImChat/index.vue'
+import { unreadTotal as imUnreadTotal } from '@/components/ImChat/useImUnread'
 import { getUnreadMessageCount } from '@/apis'
 import { useUserStore } from '@/stores'
 import { getToken } from '@/utils/auth'
@@ -132,6 +146,7 @@ const { isFullscreen, toggle } = useFullscreen()
 const router = useRouter()
 const userStore = useUserStore()
 const SettingDrawerRef = ref<InstanceType<typeof SettingDrawer>>()
+const ImChatRef = ref<InstanceType<typeof ImChat>>()
 
 // 退出登录
 const logout = () => {

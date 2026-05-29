@@ -7,6 +7,7 @@ export * from './open'
 export * from './tenant'
 export * from './schedule'
 export * from './code'
+export * from './im'
 
 export * from './area/type'
 export * from './auth/type'
