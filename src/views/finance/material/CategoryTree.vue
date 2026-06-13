@@ -18,7 +18,7 @@
         >
           <template #switcher-icon="{ isLeaf }">
             <IconCaretDown v-if="!isLeaf" />
-            <IconFolderOpen v-else />
+            <IconFolder v-else />
           </template>
           <template #title="node">
             <a-typography-paragraph

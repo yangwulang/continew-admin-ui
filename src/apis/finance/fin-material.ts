@@ -1,5 +1,6 @@
 import http from '@/utils/http'
 import type { LabelValueState } from '@/types/global'
+import type { FinSupplierMaterialResp } from '@/apis/finance/fin-supplier-material'
 
 const BASE_URL = '/finance/fin-material'
 
@@ -8,14 +9,19 @@ export interface FinMaterialResp {
   categoryId: string
   name: string
   code: string
+  imageUrl: string
   defaultUnitPrice: number
+  minPrice: number
+  supplierCount: number
   unit: string
   status: number
   remark: string
   createTime: string
 }
 
-export interface FinMaterialDetailResp extends FinMaterialResp {}
+export interface FinMaterialDetailResp extends FinMaterialResp {
+  suppliers: FinSupplierMaterialResp[]
+}
 
 export interface FinMaterialQuery {
   categoryId?: string

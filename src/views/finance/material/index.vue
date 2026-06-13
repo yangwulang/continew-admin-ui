@@ -52,12 +52,32 @@
         <a-tag v-if="record.status === 1" color="green" size="small">启用</a-tag>
         <a-tag v-else color="red" size="small">禁用</a-tag>
       </template>
-      <template #defaultUnitPrice="{ record }">
-        <span style="font-weight: 600">{{ record.defaultUnitPrice?.toFixed(2) }}</span>
+      <template #imageUrl="{ record }">
+        <div v-if="record.imageUrl" class="image-thumb-list">
+          <a-image
+            v-for="(url, idx) in record.imageUrl.split(',').filter((s: string) => s.trim())"
+            :key="idx"
+            :src="url.trim()"
+            width="32"
+            height="32"
+            fit="cover"
+            style="border-radius: 4px"
+          />
+        </div>
+        <span v-else style="color: var(--color-text-4)">暂无</span>
+      </template>
+      <template #minPrice="{ record }">
+        <span v-if="record.minPrice" style="font-weight: 600; color: rgb(var(--arcoblue-6))">{{ record.minPrice?.toFixed(2) }}</span>
+        <span v-else style="color: var(--color-text-4)">{{ record.defaultUnitPrice?.toFixed(2) || '-' }}</span>
+      </template>
+      <template #supplierCount="{ record }">
+        <a-tag v-if="record.supplierCount > 0" color="arcoblue" size="small">{{ record.supplierCount }}</a-tag>
+        <span v-else style="color: var(--color-text-4)">0</span>
       </template>
       <template #action="{ record }">
         <a-space>
           <a-link v-permission="['finance:fin-material:get']" title="详情" @click="onDetail(record)">详情</a-link>
+          <a-link v-permission="['finance:fin-material:update']" title="供应商报价" @click="onSupplierPrice(record)">报价</a-link>
           <a-link v-permission="['finance:fin-material:update']" title="修改" @click="onUpdate(record)">修改</a-link>
           <a-link
             v-permission="['finance:fin-material:delete']"
@@ -73,6 +93,7 @@
 
     <AddModal ref="AddModalRef" @save-success="search" />
     <DetailDrawer ref="DetailDrawerRef" />
+    <SupplierPriceDrawer ref="SupplierPriceDrawerRef" @save-success="search" />
   </GiPageLayout>
 </template>
 
@@ -81,6 +102,7 @@ import type { TableInstance } from '@arco-design/web-vue'
 import CategoryTree from './CategoryTree.vue'
 import AddModal from './AddModal.vue'
 import DetailDrawer from './DetailDrawer.vue'
+import SupplierPriceDrawer from './SupplierPriceDrawer.vue'
 import { type FinMaterialQuery, type FinMaterialResp, deleteFinMaterial, listFinMaterial } from '@/apis/finance/fin-material'
 import { type FinMaterialCategoryResp, listFinMaterialCategory } from '@/apis/finance/fin-material-category'
 import { useTable } from '@/hooks'
@@ -180,7 +202,9 @@ const clearCategory = () => {
 const columns: TableInstance['columns'] = [
   { title: '物料名称', dataIndex: 'name', slotName: 'name', minWidth: 140, ellipsis: true, tooltip: true },
   { title: '物料编码', dataIndex: 'code', width: 140, ellipsis: true, tooltip: true },
-  { title: '默认单价', dataIndex: 'defaultUnitPrice', slotName: 'defaultUnitPrice', width: 120, align: 'right' },
+  { title: '照片', dataIndex: 'imageUrl', slotName: 'imageUrl', width: 120, align: 'center' },
+  { title: '最低售价', dataIndex: 'minPrice', slotName: 'minPrice', width: 120, align: 'right' },
+  { title: '供应商数', dataIndex: 'supplierCount', slotName: 'supplierCount', width: 100, align: 'center' },
   { title: '计量单位', dataIndex: 'unit', width: 100, align: 'center' },
   { title: '状态', dataIndex: 'status', slotName: 'status', width: 80, align: 'center' },
   { title: '备注', dataIndex: 'remark', minWidth: 160, ellipsis: true, tooltip: true },
@@ -189,7 +213,7 @@ const columns: TableInstance['columns'] = [
     title: '操作',
     dataIndex: 'action',
     slotName: 'action',
-    width: 160,
+    width: 200,
     align: 'center',
     fixed: !isMobile() ? 'right' : undefined,
     show: has.hasPermOr(['finance:fin-material:get', 'finance:fin-material:update', 'finance:fin-material:delete']),
@@ -226,9 +250,21 @@ const onDetail = (record: FinMaterialResp) => {
   DetailDrawerRef.value?.onOpen(record.id)
 }
 
+const SupplierPriceDrawerRef = ref<InstanceType<typeof SupplierPriceDrawer>>()
+const onSupplierPrice = (record: FinMaterialResp) => {
+  SupplierPriceDrawerRef.value?.onOpen(record.id, record.name)
+}
+
 onMounted(() => {
   loadCategoryList()
 })
 </script>
 
-<style scoped lang="scss"></style>
+<style scoped lang="scss">
+.image-thumb-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+</style>

@@ -233,7 +233,7 @@
         </div>
       </div>
       <div class="footer__copy">
-        © {{ year }} FinTech Cloud. All Rights Reserved · 沪 ICP 备 2024XXXXXX 号
+        © {{ year }} FinTech Cloud. All Rights Reserved · 赣 ICP 备 2026012708 号
       </div>
     </footer>
   </div>
