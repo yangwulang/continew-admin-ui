@@ -33,8 +33,10 @@ export interface FinBillingRecordQuery {
 export interface FinBillingRecordPageQuery extends FinBillingRecordQuery, PageQuery {}
 
 export interface FinBillingCreateItemReq {
-  materialId: string
-  quantity: number
+  itemType?: string
+  materialId?: string
+  printOrderId?: string
+  quantity?: number
   unitPrice?: number
   remark?: string
 }

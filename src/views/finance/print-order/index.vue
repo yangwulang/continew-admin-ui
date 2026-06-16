@@ -21,6 +21,7 @@
           @change="search"
         >
           <a-option value="PENDING">待处理</a-option>
+          <a-option value="PENDING_SIGN">待签字</a-option>
           <a-option value="CONFIRMED">已确认</a-option>
           <a-option value="PRINTING">打印中</a-option>
           <a-option value="COMPLETED">已完成</a-option>
@@ -58,6 +59,12 @@
             @click="onPay(record)"
           >支付</a-link>
           <a-link
+            v-if="record.status === 'PENDING_SIGN' && record.billingRecordId"
+            title="签名链接"
+            style="color: #722ed1"
+            @click="onSignLink(record)"
+          >签名链接</a-link>
+          <a-link
             v-if="record.status === 'PENDING'"
             v-permission="['finance:fin-print-order:delete']"
             status="danger"
@@ -84,11 +91,24 @@
       @paid="onPayDone"
       @closed="payingRecord = null"
     />
+
+    <!-- 签名链接弹窗 -->
+    <a-modal v-model:visible="signLinkVisible" title="签名链接" :width="500" ok-text="关闭">
+      <a-space direction="vertical" fill style="width: 100%">
+        <a-alert type="info">请复制以下链接发送给客户进行签名，链接提交后将自动失效</a-alert>
+        <a-textarea :model-value="signLinkUrl" :auto-size="{ minRows: 2 }" readonly />
+        <a-button type="primary" long @click="copySignLink">
+          <template #icon><icon-copy /></template>
+          复制链接
+        </a-button>
+      </a-space>
+    </a-modal>
   </GiPageLayout>
 </template>
 
 <script setup lang="ts">
 import type { TableInstance } from '@arco-design/web-vue'
+import { Message } from '@arco-design/web-vue'
 import AddModal from './AddModal.vue'
 import DetailDrawer from './DetailDrawer.vue'
 import PaymentModal from './PaymentModal.vue'
@@ -98,15 +118,18 @@ import {
   deletePrintOrder,
   listPrintOrder,
 } from '@/apis/finance/print-order'
+import { generateFinBillingSignLink } from '@/apis/finance/fin-billing-record'
 import { useTable } from '@/hooks'
 import { isMobile } from '@/utils'
 import has from '@/utils/has'
+import http from '@/utils/http'
 
 defineOptions({ name: 'FinPrintOrder' })
 
 const statusLabelMap: Record<string, string> = {
   PENDING: '待处理',
   CONFIRMED: '已确认',
+  PENDING_SIGN: '待签字',
   PRINTING: '打印中',
   COMPLETED: '已完成',
   CANCELLED: '已取消',
@@ -114,6 +137,7 @@ const statusLabelMap: Record<string, string> = {
 const statusColorMap: Record<string, string> = {
   PENDING: 'orangered',
   CONFIRMED: 'blue',
+  PENDING_SIGN: 'purple',
   PRINTING: 'arcoblue',
   COMPLETED: 'green',
   CANCELLED: 'gray',
@@ -122,11 +146,13 @@ const paymentStatusLabelMap: Record<string, string> = {
   PAID: '已支付',
   PARTIAL: '余额已付/待补付',
   UNPAID: '待支付',
+  BILLING: '记账',
 }
 const paymentStatusColorMap: Record<string, string> = {
   PAID: 'green',
   PARTIAL: 'orange',
   UNPAID: 'red',
+  BILLING: 'purple',
 }
 
 const queryForm = reactive<PrintOrderQuery>({
@@ -145,6 +171,7 @@ const {
 const columns: TableInstance['columns'] = [
   { title: '订单编号', dataIndex: 'orderNo', width: 220 },
   { title: '客户名称', dataIndex: 'customerName', width: 150 },
+  { title: '项目名称', dataIndex: 'projectName', width: 150 },
   { title: '金额', dataIndex: 'totalAmount', slotName: 'totalAmount', width: 120, align: 'right' },
   { title: '订单状态', dataIndex: 'status', slotName: 'status', width: 100, align: 'center' },
   { title: '支付状态', dataIndex: 'paymentStatus', slotName: 'paymentStatus', width: 130, align: 'center' },
@@ -193,6 +220,33 @@ const onPay = async (record: PrintOrderResp) => {
 const onPayDone = () => {
   payingRecord.value = null
   search()
+}
+
+// ===== 签名链接 =====
+const signLinkVisible = ref(false)
+const signLinkUrl = ref('')
+
+const onSignLink = async (record: PrintOrderResp) => {
+  if (!record.billingRecordId) {
+    Message.warning('该订单未关联记账记录')
+    return
+  }
+  try {
+    const { data } = await generateFinBillingSignLink(String(record.billingRecordId))
+    signLinkUrl.value = `${window.location.origin}${data}`
+    signLinkVisible.value = true
+    search()
+  } catch (e: any) {
+    Message.error(e?.msg || '生成签名链接失败')
+  }
+}
+
+const copySignLink = () => {
+  navigator.clipboard.writeText(signLinkUrl.value).then(() => {
+    Message.success('链接已复制到剪贴板')
+  }).catch(() => {
+    Message.warning('复制失败，请手动选择复制')
+  })
 }
 </script>
 

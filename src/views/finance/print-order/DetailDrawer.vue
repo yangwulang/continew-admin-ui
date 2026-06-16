@@ -6,6 +6,7 @@
         <a-descriptions :column="2" size="large" class="general-description">
           <a-descriptions-item label="订单编号" :span="2">{{ detail.orderNo }}</a-descriptions-item>
           <a-descriptions-item label="客户名称">{{ detail?.customerName || detail?.customerId }}</a-descriptions-item>
+          <a-descriptions-item label="项目名称">{{ detail?.projectName || '—' }}</a-descriptions-item>
           <a-descriptions-item label="总金额">
             <span style="font-weight: 600; color: #f53f3f; font-size: 16px">{{ detail.totalAmount?.toFixed(2) }} 元</span>
           </a-descriptions-item>
@@ -100,8 +101,8 @@ const statusColorMap: Record<string, string> = {
   COMPLETED: 'green',
   CANCELLED: 'gray',
 }
-const paymentLabelMap: Record<string, string> = { PAID: '已支付', PARTIAL: '余额已付/待补付', UNPAID: '待支付' }
-const paymentColorMap: Record<string, string> = { PAID: 'green', PARTIAL: 'orange', UNPAID: 'red' }
+const paymentLabelMap: Record<string, string> = { PAID: '已支付', PARTIAL: '余额已付/待补付', UNPAID: '待支付', BILLING: '记账' }
+const paymentColorMap: Record<string, string> = { PAID: 'green', PARTIAL: 'orange', UNPAID: 'red', BILLING: 'purple' }
 
 const visible = ref(false)
 const loading = ref(false)

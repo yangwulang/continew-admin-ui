@@ -46,107 +46,131 @@
         </a-select>
       </a-form-item>
 
+      <!-- 项目名称 -->
+      <a-form-item label="项目名称" field="projectName">
+        <a-input v-model="form.projectName" placeholder="请输入项目名称（选填）" />
+      </a-form-item>
+
       <!-- 文件项列表 -->
-      <a-divider orientation="left">
-        打印文件列表
-        <a-button type="text" size="small" style="margin-left: 8px" @click="addItem">
+      <a-divider orientation="left">打印文件列表</a-divider>
+
+      <div v-if="form.items.length === 0" style="text-align: center; padding: 24px; border: 1px dashed var(--color-neutral-3); border-radius: 4px; margin-bottom: 12px">
+        <a-empty description="暂无打印文件" />
+        <a-button type="dashed" style="margin-top: 8px" @click="addItem">
           <template #icon><icon-plus /></template>
           添加文件
         </a-button>
-      </a-divider>
+      </div>
 
-      <a-empty v-if="form.items.length === 0" description="请点击「添加文件」" />
-
-      <a-card v-for="(item, idx) in form.items" :key="idx" style="margin-bottom: 12px" :body-style="{ padding: '16px' }">
-        <template #title>
-          <span>文件 {{ idx + 1 }}{{ item.fileName ? ` - ${item.fileName}` : '' }}</span>
-        </template>
-        <template #extra>
-          <a-popconfirm content="确定删除此文件项？" @ok="removeItem(idx)">
-            <a-button type="text" status="danger" size="small">
-              <template #icon><icon-delete /></template>
+      <a-tabs
+        v-else
+        v-model:active-key="activeTabKey"
+        type="card"
+        style="margin-bottom: 12px"
+      >
+        <a-tab-pane v-for="(item, idx) in form.items" :key="String(idx)">
+          <template #title>
+            <span>文件 {{ idx + 1 }}{{ item.fileName ? ` - ${item.fileName}` : '' }}</span>
+            <a-button type="text" status="danger" size="mini" style="margin-left: 4px; padding: 0 2px" @click.stop="removeItem(idx)">
+              <template #icon><icon-close /></template>
             </a-button>
-          </a-popconfirm>
-        </template>
+          </template>
+          <div style="padding: 8px 4px">
+            <!-- 上传文件 -->
+            <a-row :gutter="16">
+              <a-col :span="16">
+                <a-form-item label="上传文件" :field="`items.${idx}.fileUrl`" :rules="[{ required: true, message: '请上传文件' }]">
+                  <a-space direction="vertical" fill style="width: 100%">
+                    <a-upload
+                      :auto-upload="false"
+                      :limit="1"
+                      accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp"
+                      :file-list="fileLists[idx] || []"
+                      @change="(list: FileItem[]) => handleFileChange(idx, list)"
+                    >
+                      <template #upload-button>
+                        <a-button type="outline" size="small">
+                          <template #icon><icon-upload /></template>
+                          选择文件
+                        </a-button>
+                      </template>
+                    </a-upload>
+                    <a-space v-if="uploadLoadings[idx]">
+                      <a-spin :size="16" />
+                      <span style="color: var(--color-text-3); font-size: 12px">上传并检测页数...</span>
+                    </a-space>
+                    <a-tag v-if="item.pageCount > 0" color="green" size="small">{{ item.pageCount }} 页</a-tag>
+                  </a-space>
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="份数" :field="`items.${idx}.copies`" :rules="[{ required: true, message: '请输入份数' }]">
+                  <a-input-number v-model="item.copies" :min="1" :max="9999" placeholder="份数" style="width: 100%" @change="onOptionChange" />
+                </a-form-item>
+              </a-col>
+            </a-row>
 
-        <!-- 上传文件 -->
-        <a-row :gutter="16">
-          <a-col :span="16">
-            <a-form-item label="上传文件" :field="`items.${idx}.fileUrl`" :rules="[{ required: true, message: '请上传文件' }]">
-              <a-space direction="vertical" fill style="width: 100%">
-                <a-upload
-                  :auto-upload="false"
-                  :limit="1"
-                  accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp"
-                  :file-list="fileLists[idx] || []"
-                  @change="(list: FileItem[]) => handleFileChange(idx, list)"
-                >
-                  <template #upload-button>
-                    <a-button type="outline" size="small">
-                      <template #icon><icon-upload /></template>
-                      选择文件
-                    </a-button>
-                  </template>
-                </a-upload>
-                <a-space v-if="uploadLoadings[idx]">
-                  <a-spin :size="16" />
-                  <span style="color: var(--color-text-3); font-size: 12px">上传并检测页数...</span>
-                </a-space>
-                <a-tag v-if="item.pageCount > 0" color="green" size="small">{{ item.pageCount }} 页</a-tag>
-              </a-space>
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="份数" :field="`items.${idx}.copies`" :rules="[{ required: true, message: '请输入份数' }]">
-              <a-input-number v-model="item.copies" :min="1" :max="9999" placeholder="份数" style="width: 100%" @change="onOptionChange" />
-            </a-form-item>
-          </a-col>
-        </a-row>
+            <!-- 该项的打印属性 -->
+            <a-spin :loading="attrLoading" style="width: 100%">
+              <a-row :gutter="12" :wrap="true">
+                <a-col v-for="attr in attributes" :key="attr.id" :span="12" style="margin-bottom: 4px">
+                  <a-form-item
+                    :label="attr.name"
+                    :field="`opt.${idx}.${attr.id}`"
+                    :rules="attr.isRequired ? [{ required: true, message: `请选择${attr.name}` }] : undefined"
+                    style="margin-bottom: 8px"
+                  >
+                    <a-radio-group
+                      v-if="attr.inputType === 'SELECT'"
+                      v-model="itemOptions[idx][attr.id]"
+                      @change="onOptionChange(idx)"
+                    >
+                      <a-radio
+                        v-for="opt in getVisibleOptions(idx, attr)"
+                        :key="opt.id"
+                        :value="opt.id"
+                      >
+                        {{ opt.name }}
+                        <span style="color: var(--color-text-3); font-size: 12px">
+                          <template v-if="opt.priceMode === 'PER_PAGE'">({{ opt.price }}/页)</template>
+                          <template v-else-if="opt.priceMode === 'FIXED'">({{ opt.price }}元)</template>
+                          <template v-else-if="opt.priceMode === 'MULTIPLIER'">(x{{ opt.price }})</template>
+                        </span>
+                      </a-radio>
+                    </a-radio-group>
+                    <a-checkbox-group v-else v-model="itemOptions[idx][attr.id]" @change="onOptionChange(idx)">
+                      <a-checkbox
+                        v-for="opt in getVisibleOptions(idx, attr)"
+                        :key="opt.id"
+                        :value="opt.id"
+                      >
+                        {{ opt.name }}
+                        <span style="color: var(--color-text-3); font-size: 12px">
+                          <template v-if="opt.priceMode === 'PER_PAGE'">({{ opt.price }}/页)</template>
+                          <template v-else-if="opt.priceMode === 'FIXED'">({{ opt.price }}元)</template>
+                          <template v-else-if="opt.priceMode === 'MULTIPLIER'">(x{{ opt.price }})</template>
+                        </span>
+                      </a-checkbox>
+                    </a-checkbox-group>
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </a-spin>
 
-        <!-- 该项的打印属性 -->
-        <a-spin :loading="attrLoading" style="width: 100%">
-          <a-row :gutter="12" :wrap="true">
-            <a-col v-for="attr in attributes" :key="attr.id" :span="12" style="margin-bottom: 4px">
-              <a-form-item
-                :label="attr.name"
-                :field="`opt.${idx}.${attr.id}`"
-                :rules="attr.isRequired ? [{ required: true, message: `请选择${attr.name}` }] : undefined"
-                style="margin-bottom: 8px"
-              >
-                <a-radio-group
-                  v-if="attr.inputType === 'SELECT'"
-                  v-model="itemOptions[idx][attr.id]"
-                  @change="onOptionChange"
-                >
-                  <a-radio v-for="opt in attr.options" :key="opt.id" :value="opt.id">
-                    {{ opt.name }}
-                    <span style="color: var(--color-text-3); font-size: 12px">
-                      <template v-if="opt.priceMode === 'PER_PAGE'">({{ opt.price }}/页)</template>
-                      <template v-else-if="opt.priceMode === 'FIXED'">({{ opt.price }}元)</template>
-                      <template v-else-if="opt.priceMode === 'MULTIPLIER'">(x{{ opt.price }})</template>
-                    </span>
-                  </a-radio>
-                </a-radio-group>
-                <a-checkbox-group v-else v-model="itemOptions[idx][attr.id]" @change="onOptionChange">
-                  <a-checkbox v-for="opt in attr.options" :key="opt.id" :value="opt.id">
-                    {{ opt.name }}
-                    <span style="color: var(--color-text-3); font-size: 12px">
-                      <template v-if="opt.priceMode === 'PER_PAGE'">({{ opt.price }}/页)</template>
-                      <template v-else-if="opt.priceMode === 'FIXED'">({{ opt.price }}元)</template>
-                      <template v-else-if="opt.priceMode === 'MULTIPLIER'">(x{{ opt.price }})</template>
-                    </span>
-                  </a-checkbox>
-                </a-checkbox-group>
-              </a-form-item>
-            </a-col>
-          </a-row>
-        </a-spin>
+            <!-- 小计 -->
+            <div v-if="priceResult && priceResult.items[idx]" style="text-align: right; color: #165dff; font-weight: 600">
+              小计: {{ priceResult.items[idx].subtotalAmount?.toFixed(2) }} 元
+            </div>
+          </div>
+        </a-tab-pane>
+      </a-tabs>
 
-        <!-- 小计 -->
-        <div v-if="priceResult && priceResult.items[idx]" style="text-align: right; color: #165dff; font-weight: 600">
-          小计: {{ priceResult.items[idx].subtotalAmount?.toFixed(2) }} 元
-        </div>
-      </a-card>
+      <div v-if="form.items.length > 0" style="text-align: center; margin-bottom: 12px">
+        <a-button type="dashed" size="small" @click="addItem">
+          <template #icon><icon-plus /></template>
+          添加文件
+        </a-button>
+      </div>
 
       <!-- 价格明细汇总 -->
       <a-divider orientation="left">价格明细</a-divider>
@@ -184,8 +208,44 @@
         <a-empty v-else description="请添加文件并选择打印选项后查看价格" />
       </a-spin>
 
+      <!-- 约束规则验证提示 -->
+      <a-alert v-if="constraintViolations.length > 0" type="warning" style="margin-bottom: 16px">
+        <template #title>配置违规</template>
+        <ul style="margin: 4px 0; padding-left: 18px">
+          <li v-for="(v, i) in constraintViolations" :key="i">{{ v }}</li>
+        </ul>
+      </a-alert>
+
+      <!-- 优惠券 -->
+      <a-divider orientation="left">优惠券</a-divider>
+      <a-row :gutter="16" style="margin-bottom: 8px">
+        <a-col :span="14">
+          <a-input
+            v-model="form.couponCode"
+            placeholder="输入优惠券码（选填）"
+            allow-clear
+            @blur="onCouponBlur"
+            @clear="clearCoupon"
+          >
+            <template #prefix><icon-gift /></template>
+          </a-input>
+        </a-col>
+        <a-col :span="6">
+          <a-button :loading="couponChecking" @click="onCouponBlur">验证券码</a-button>
+        </a-col>
+      </a-row>
+      <a-alert v-if="couponResult" :type="couponResult.valid ? 'success' : 'warning'" style="margin-bottom: 12px">
+        <template #message>
+          <template v-if="couponResult.valid">
+            券码有效！优惠金额：<strong>-¥{{ couponResult.discountAmount?.toFixed(2) }}</strong>
+            &nbsp;|&nbsp;折后价：<strong style="color: #f53f3f">¥{{ couponResult.finalAmount?.toFixed(2) }}</strong>
+          </template>
+          <template v-else>{{ couponResult.message }}</template>
+        </template>
+      </a-alert>
+
       <!-- 备注 -->
-      <a-form-item label="备注" field="remark" style="margin-top: 16px">
+      <a-form-item label="备注" field="remark" style="margin-top: 8px">
         <a-textarea v-model="form.remark" placeholder="备注信息（选填）" :auto-size="{ minRows: 2, maxRows: 4 }" />
       </a-form-item>
     </a-form>
@@ -219,6 +279,8 @@ import {
   listPrintAttributes,
   uploadPrintFile,
 } from '@/apis/finance/print-order'
+import { type CouponCheckResult, checkCoupon } from '@/apis/finance/coupon'
+import { getAvailableOptions, validatePrintConfig } from '@/apis/finance/printConfigRule'
 import { type FinCustomerResp, listFinCustomer } from '@/apis/finance/fin-customer'
 
 const emit = defineEmits<{
@@ -255,9 +317,11 @@ const customerBalance = ref<number | null>(null)
 
 const form = reactive({
   customerId: undefined as string | undefined,
+  projectName: '',
   items: [] as FormItem[],
   remark: '',
   opt: {} as Record<number, Record<number, number | number[]>>,
+  couponCode: '',
 })
 
 // 每个文件项的上传状态和文件列表
@@ -266,6 +330,16 @@ const uploadLoadings = reactive<Record<number, boolean>>({})
 
 // 每个文件项独立的选项 { [itemIdx]: { [attrId]: selectedOptionId(s) } }
 const itemOptions = reactive<Record<number, Record<number, number | number[]>>>({})
+
+// 每个文件项的隐藏选项集合 { [itemIdx]: { [attrId]: Set<number> } }
+const hiddenOptionsMap = reactive<Record<number, Record<number, Set<number>>>>({})
+
+// 约束验证提示
+const constraintViolations = ref<string[]>([])
+
+// 竞态控制版本号
+let constraintVersion = 0
+let hiddenOptionsVersion = 0
 
 // 客户搜索
 const customerList = ref<FinCustomerResp[]>([])
@@ -279,6 +353,13 @@ const searchCustomer = async (keyword: string) => {
   } finally {
     customerLoading.value = false
   }
+}
+
+// 获取当前客户的 deptId
+const getCustomerDeptId = () => {
+  if (!form.customerId) return undefined
+  const found = customerList.value.find((c) => c.id === form.customerId)
+  return found?.deptId
 }
 
 // 客户选择变化时更新余额（价格重算在 onOptionChange 定义后注册）
@@ -300,6 +381,31 @@ const priceResult = ref<PrintPriceCalculateResp | null>(null)
 const priceLoading = ref(false)
 let priceTimer: ReturnType<typeof setTimeout> | null = null
 
+// 优惠券验证
+const couponChecking = ref(false)
+const couponResult = ref<CouponCheckResult | null>(null)
+
+const clearCoupon = () => {
+  couponResult.value = null
+}
+
+const onCouponBlur = async () => {
+  if (!form.couponCode?.trim()) {
+    couponResult.value = null
+    return
+  }
+  couponChecking.value = true
+  try {
+    const orderAmount = priceResult.value?.totalAmount
+    const { data } = await checkCoupon(form.couponCode.trim(), form.customerId, orderAmount)
+    couponResult.value = data
+  } catch {
+    couponResult.value = null
+  } finally {
+    couponChecking.value = false
+  }
+}
+
 watch(() => itemOptions, () => {
   form.opt = itemOptions
 }, { deep: true })
@@ -318,6 +424,101 @@ const getItemOptionIds = (idx: number): number[] => {
     }
   }
   return ids
+}
+
+// 构建某项的属性编码->选项编码映射（供约束引擎使用）
+const buildAttrCodeMap = (idx: number): Record<string, string> => {
+  const result: Record<string, string> = {}
+  const opts = itemOptions[idx]
+  if (!opts) return result
+  for (const attr of attributes.value) {
+    const val = opts[attr.id]
+    if (val != null) {
+      let optCode = ''
+      if (Array.isArray(val)) {
+        // 多选：取第一个（约束规则通常针对单选场景）
+        if (val.length > 0) {
+          const opt = attr.options.find((o) => o.id === val[0])
+          optCode = opt?.code || ''
+        }
+      } else {
+        const opt = attr.options.find((o) => o.id === val)
+        optCode = opt?.code || ''
+      }
+      if (optCode) {
+        result[attr.code] = optCode
+      }
+    }
+  }
+  return result
+}
+
+// 获取某项某属性的可见选项（过滤隐藏选项）
+const getVisibleOptions = (idx: number, attr: PrintAttributeWithOptions) => {
+  const hidden = hiddenOptionsMap[idx]?.[attr.id]
+  if (!hidden || hidden.size === 0) return attr.options
+  return attr.options.filter((o) => !hidden.has(o.id))
+}
+
+// 刷新某项的隐藏选项
+const refreshHiddenOptions = async (idx: number) => {
+  const version = ++hiddenOptionsVersion
+  const attrCodeMap = buildAttrCodeMap(idx)
+  if (Object.keys(attrCodeMap).length === 0) {
+    // 无选项时清空隐藏状态
+    if (hiddenOptionsMap[idx]) {
+      for (const attrId of Object.keys(hiddenOptionsMap[idx])) {
+        hiddenOptionsMap[idx][Number(attrId)] = new Set<number>()
+      }
+    }
+    return
+  }
+
+  // 为每个属性查询可用选项
+  for (const attr of attributes.value) {
+    try {
+      const { data } = await getAvailableOptions(attr.code, attrCodeMap, form.customerId, getCustomerDeptId())
+      // 竞态检查
+      if (version !== hiddenOptionsVersion) return
+      // data 是可用选项编码列表，取差集算隐藏的
+      const availableCodes = new Set(data || [])
+      const hiddenIds = new Set<number>()
+      for (const opt of attr.options) {
+        if (!availableCodes.has(opt.code)) {
+          hiddenIds.add(opt.id)
+        }
+      }
+      if (!hiddenOptionsMap[idx]) hiddenOptionsMap[idx] = {}
+      hiddenOptionsMap[idx][attr.id] = hiddenIds
+    } catch {
+      // 忽略错误，不影响主流程
+    }
+  }
+}
+
+// 约束规则验证
+const validateConstraints = async () => {
+  const version = ++constraintVersion
+  // 先清空旧违规，避免切换后旧状态残留
+  constraintViolations.value = []
+  const allViolations: string[] = []
+  for (let idx = 0; idx < form.items.length; idx++) {
+    const attrCodeMap = buildAttrCodeMap(idx)
+    if (Object.keys(attrCodeMap).length === 0) continue
+    try {
+      const { data } = await validatePrintConfig(attrCodeMap, form.customerId, getCustomerDeptId())
+      // 竞态检查：如果期间有新的验证请求，放弃本次结果
+      if (version !== constraintVersion) return
+      if (data && !data.valid && data.violations) {
+        allViolations.push(...data.violations.map((v) => `文件${idx + 1}: ${v}`))
+      }
+    } catch {
+      // 忽略
+    }
+  }
+  // 再次检查竞态
+  if (version !== constraintVersion) return
+  constraintViolations.value = allViolations
 }
 
 const initItemOptions = (idx: number) => {
@@ -348,6 +549,7 @@ const doCalculatePrice = async () => {
   try {
     const { data } = await calculatePrintPrice({
       customerId: form.customerId ? Number(form.customerId) : undefined,
+      deptId: getCustomerDeptId() ? Number(getCustomerDeptId()) : undefined,
       items,
     })
     priceResult.value = data
@@ -358,7 +560,20 @@ const doCalculatePrice = async () => {
   }
 }
 
-const onOptionChange = () => {
+const onOptionChange = (idx?: number) => {
+  // 先清空旧违规（避免切回合法选项时旧提示残留）
+  constraintViolations.value = []
+  // 验证约束规则（异步，带竞态保护）
+  validateConstraints()
+  // 刷新隐藏选项（异步，带竞态保护）
+  if (idx !== undefined) {
+    refreshHiddenOptions(idx)
+  } else {
+    // 无 idx 时刷新所有项
+    for (let i = 0; i < form.items.length; i++) {
+      refreshHiddenOptions(i)
+    }
+  }
   if (priceTimer) clearTimeout(priceTimer)
   priceTimer = setTimeout(doCalculatePrice, 300)
 }
@@ -381,33 +596,50 @@ const hasCustomPrice = () => {
   return false
 }
 
+// Tab 栏当前激活 key
+const activeTabKey = ref('0')
+
 const addItem = () => {
   const idx = form.items.length
   form.items.push({ fileUrl: '', fileName: '', pageCount: 0, copies: 1 })
   fileLists[idx] = []
   uploadLoadings[idx] = false
   initItemOptions(idx)
+  activeTabKey.value = String(idx)
 }
 
 const removeItem = (idx: number) => {
+  // 调整 activeTabKey
+  if (form.items.length <= 1) {
+    activeTabKey.value = ''
+  } else if (Number(activeTabKey.value) === idx) {
+    activeTabKey.value = String(Math.max(0, idx - 1))
+  } else if (Number(activeTabKey.value) > idx) {
+    activeTabKey.value = String(Number(activeTabKey.value) - 1)
+  }
+
   form.items.splice(idx, 1)
   // 重建 fileLists / uploadLoadings / itemOptions 索引
   const newFileLists: Record<number, FileItem[]> = {}
   const newUploadLoadings: Record<number, boolean> = {}
   const newItemOptions: Record<number, Record<number, number | number[]>> = {}
+  const newHiddenOptions: Record<number, Record<number, Set<number>>> = {}
   form.items.forEach((_, i) => {
     const oldIdx = i >= idx ? i + 1 : i
     newFileLists[i] = fileLists[oldIdx] || []
     newUploadLoadings[i] = uploadLoadings[oldIdx] || false
     newItemOptions[i] = itemOptions[oldIdx] || {}
+    newHiddenOptions[i] = hiddenOptionsMap[oldIdx] || {}
   })
   // 清理旧数据并重新赋值
   Object.keys(fileLists).forEach((k) => delete fileLists[Number(k)])
   Object.keys(uploadLoadings).forEach((k) => delete uploadLoadings[Number(k)])
   Object.keys(itemOptions).forEach((k) => delete itemOptions[Number(k)])
+  Object.keys(hiddenOptionsMap).forEach((k) => delete hiddenOptionsMap[Number(k)])
   Object.assign(fileLists, newFileLists)
   Object.assign(uploadLoadings, newUploadLoadings)
   Object.assign(itemOptions, newItemOptions)
+  Object.assign(hiddenOptionsMap, newHiddenOptions)
   onOptionChange()
 }
 
@@ -473,6 +705,12 @@ const handleSubmit = async () => {
       }
     }
 
+    // 约束规则验证
+    if (constraintViolations.value.length > 0) {
+      Message.error(`配置违规：${constraintViolations.value[0]}`)
+      return false
+    }
+
     submitting.value = true
     const items = form.items.map((item, idx) => ({
       fileUrl: item.fileUrl,
@@ -484,13 +722,23 @@ const handleSubmit = async () => {
 
     const { data: createResp } = await createPrintOrder({
       customerId: form.customerId! as unknown as number,
+      projectName: form.projectName || undefined,
+      deptId: getCustomerDeptId() as unknown as number,
       items,
       remark: form.remark,
+      couponCode: form.couponCode?.trim() || undefined,
     })
 
     if (createResp.paymentStatus === 'PAID') {
       // 余额全额扮款，直接成功
       Message.success('订单创建成功，余额已全额扮款')
+      emit('save-success')
+      return true
+    }
+
+    if (createResp.paymentStatus === 'BILLING') {
+      // 记账客户：走记账签名流程，不需要支付
+      Message.success('订单创建成功，等待客户签字确认')
       emit('save-success')
       return true
     }
@@ -531,14 +779,20 @@ const onPaymentClosed = () => {
 const resetForm = () => {
   formRef.value?.resetFields()
   form.customerId = undefined
+  form.projectName = ''
   form.items = []
   form.remark = ''
+  form.couponCode = ''
+  couponResult.value = null
   Object.keys(fileLists).forEach((k) => delete fileLists[Number(k)])
   Object.keys(uploadLoadings).forEach((k) => delete uploadLoadings[Number(k)])
   Object.keys(itemOptions).forEach((k) => delete itemOptions[Number(k)])
+  Object.keys(hiddenOptionsMap).forEach((k) => delete hiddenOptionsMap[Number(k)])
   priceResult.value = null
   paymentInfo.value = null
   customerBalance.value = null
+  constraintViolations.value = []
+  activeTabKey.value = '0'
 }
 
 const onOpen = async () => {

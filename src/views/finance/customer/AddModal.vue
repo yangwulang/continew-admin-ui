@@ -49,6 +49,7 @@ const loadUsers = async () => {
 const [form, resetForm] = useResetReactive<FinCustomerCreateReq>({
   userId: undefined as any,
   enablePrepaid: false,
+  enableBilling: false,
   allowNegativeBalance: false,
   remark: undefined,
 })
@@ -70,6 +71,17 @@ const columns: ColumnItem[] = reactive([
   {
     label: '预充值记账',
     field: 'enablePrepaid',
+    type: 'switch',
+    span: 12,
+    props: {
+      type: 'round',
+      checkedText: '启用',
+      uncheckedText: '禁用',
+    },
+  },
+  {
+    label: '记账客户',
+    field: 'enableBilling',
     type: 'switch',
     span: 12,
     props: {
@@ -142,6 +154,7 @@ const onUpdate = async (id: string) => {
   const { data } = await getFinCustomer(id)
   form.userId = data.userId
   form.enablePrepaid = data.enablePrepaid
+  form.enableBilling = data.enableBilling
   form.allowNegativeBalance = data.allowNegativeBalance
   form.remark = data.remark
   visible.value = true

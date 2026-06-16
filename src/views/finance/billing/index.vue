@@ -50,7 +50,7 @@
         <a-space>
           <a-link v-permission="['finance:fin-billing-record:get']" title="详情" @click="onDetail(record)">详情</a-link>
           <a-link
-            v-if="record.status === 'DRAFT' || record.status === 'REJECTED'"
+            v-if="record.status === 'DRAFT' || record.status === 'REJECTED' || record.status === 'PENDING_SIGN'"
             v-permission="['finance:fin-billing-record:create']"
             title="生成签名链接"
             @click="onSignLink(record)"

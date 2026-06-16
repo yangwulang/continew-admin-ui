@@ -12,6 +12,7 @@ export interface FinCustomerResp {
   email: string
   deptId?: string
   enablePrepaid: boolean
+  enableBilling: boolean
   allowNegativeBalance: boolean
   remark: string
   createTime: string
@@ -38,6 +39,7 @@ export function getFinCustomer(id: string) {
 export interface FinCustomerCreateReq {
   userId: string
   enablePrepaid: boolean
+  enableBilling: boolean
   allowNegativeBalance: boolean
   remark?: string
 }

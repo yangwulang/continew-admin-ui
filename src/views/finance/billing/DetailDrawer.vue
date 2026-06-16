@@ -21,7 +21,13 @@
     <a-divider orientation="left">记账明细</a-divider>
     <a-table :data="itemList" :pagination="false" size="small" :loading="itemLoading">
       <template #columns>
-        <a-table-column title="物料名称" data-index="materialName" />
+        <a-table-column title="类型" :width="70" align="center">
+          <template #cell="{ record }">
+            <a-tag v-if="record.itemType === 'PRINT'" color="arcoblue" size="small">打印</a-tag>
+            <a-tag v-else color="green" size="small">物料</a-tag>
+          </template>
+        </a-table-column>
+        <a-table-column title="项目名称" data-index="materialName" />
         <a-table-column title="单价" data-index="unitPrice" :width="100">
           <template #cell="{ record }">{{ record.unitPrice?.toFixed(2) }}</template>
         </a-table-column>

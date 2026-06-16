@@ -42,9 +42,17 @@
 
       <a-table :data="form.items" :pagination="false" size="small" :bordered="{ cell: true }">
         <template #columns>
-          <a-table-column title="物料" :width="220">
+          <a-table-column title="类型" :width="90" align="center">
+            <template #cell="{ record }">
+              <a-tag v-if="record.itemType === 'PRINT'" color="arcoblue">打印</a-tag>
+              <a-tag v-else color="green">物料</a-tag>
+            </template>
+          </a-table-column>
+          <!-- 物料记账：显示物料选择 -->
+          <a-table-column v-if="hasMaterialItem" title="物料" :width="200">
             <template #cell="{ record, rowIndex }">
               <a-select
+                v-if="record.itemType !== 'PRINT'"
                 v-model="record.materialId"
                 placeholder="选择物料"
                 allow-search
@@ -54,29 +62,65 @@
               >
                 <a-option v-for="m in materialList" :key="m.id" :value="m.id" :label="`${m.name}（${m.unit || ''}）`" />
               </a-select>
+              <span v-else>-</span>
             </template>
           </a-table-column>
-          <a-table-column title="单价" :width="130">
+          <!-- 打印记账：显示打印订单选择 -->
+          <a-table-column v-if="hasPrintItem" title="打印订单" :width="200">
+            <template #cell="{ record, rowIndex }">
+              <a-select
+                v-if="record.itemType === 'PRINT'"
+                v-model="record.printOrderId"
+                placeholder="选择打印订单"
+                allow-search
+                allow-clear
+                :loading="printOrderLoading"
+                @change="onPrintOrderChange(rowIndex)"
+              >
+                <a-option v-for="o in printOrderList" :key="o.id" :value="o.id" :label="`${o.orderNo}（¥${o.totalAmount}）`" />
+              </a-select>
+              <span v-else>-</span>
+            </template>
+          </a-table-column>
+          <a-table-column title="单价" :width="120">
             <template #cell="{ record }">
-              <a-input-number v-model="record.unitPrice" :min="0" :precision="2" placeholder="自动" hide-button @change="calcItemAmount(record)" />
+              <a-input-number
+                v-if="record.itemType !== 'PRINT'"
+                v-model="record.unitPrice"
+                :min="0"
+                :precision="2"
+                placeholder="自动"
+                hide-button
+                @change="calcItemAmount(record)"
+              />
+              <span v-else>{{ record.unitPrice?.toFixed(2) || '0.00' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="数量" :width="120">
+          <a-table-column title="数量" :width="110">
             <template #cell="{ record }">
-              <a-input-number v-model="record.quantity" :min="0.01" :precision="2" placeholder="数量" hide-button @change="calcItemAmount(record)" />
+              <a-input-number
+                v-if="record.itemType !== 'PRINT'"
+                v-model="record.quantity"
+                :min="0.01"
+                :precision="2"
+                placeholder="数量"
+                hide-button
+                @change="calcItemAmount(record)"
+              />
+              <span v-else>1</span>
             </template>
           </a-table-column>
-          <a-table-column title="金额" :width="120">
+          <a-table-column title="金额" :width="110">
             <template #cell="{ record }">
               <span style="font-weight: 600">{{ record.amount?.toFixed(2) || '0.00' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="备注" :width="160">
+          <a-table-column title="备注" :width="140">
             <template #cell="{ record }">
               <a-input v-model="record.remark" placeholder="备注" />
             </template>
           </a-table-column>
-          <a-table-column title="操作" :width="80" align="center">
+          <a-table-column title="操作" :width="70" align="center">
             <template #cell="{ rowIndex }">
               <a-button type="text" status="danger" size="mini" @click="removeItem(rowIndex)">
                 <template #icon><icon-delete /></template>
@@ -87,9 +131,13 @@
       </a-table>
 
       <a-space style="margin-top: 12px">
-        <a-button type="dashed" long @click="addItem">
+        <a-button type="dashed" @click="addItem('MATERIAL')">
           <template #icon><icon-plus /></template>
-          添加明细
+          添加物料明细
+        </a-button>
+        <a-button type="dashed" @click="addItem('PRINT')">
+          <template #icon><icon-plus /></template>
+          添加打印明细
         </a-button>
       </a-space>
 
@@ -109,6 +157,7 @@ import { type FinCustomerResp, listFinCustomer } from '@/apis/finance/fin-custom
 import { type FinCustomerMaterialPriceResp, listFinCustomerMaterialPrice } from '@/apis/finance/fin-customer-material-price'
 import { type FinDeptMaterialPriceResp, listFinDeptMaterialPrice } from '@/apis/finance/fin-dept-material-price'
 import { type FinMaterialResp, listFinMaterial } from '@/apis/finance/fin-material'
+import { type PrintOrderResp, listPrintOrder } from '@/apis/finance/print-order'
 import { useDept } from '@/hooks/app'
 
 const emit = defineEmits<{
@@ -120,7 +169,9 @@ const visible = ref(false)
 const formRef = ref()
 
 interface ItemRow {
+  itemType: 'MATERIAL' | 'PRINT'
   materialId: string | undefined
+  printOrderId: string | undefined
   unitPrice: number | undefined
   quantity: number | undefined
   amount: number
@@ -133,6 +184,10 @@ const form = reactive({
   billingDate: undefined as string | undefined,
   items: [] as ItemRow[],
 })
+
+// 是否有物料/打印类型的明细行（控制列的显示）
+const hasMaterialItem = computed(() => form.items.some((i) => i.itemType !== 'PRINT'))
+const hasPrintItem = computed(() => form.items.some((i) => i.itemType === 'PRINT'))
 
 // ===== 客户列表 =====
 const customerList = ref<FinCustomerResp[]>([])
@@ -180,6 +235,21 @@ const loadMaterials = async () => {
     materialList.value = data.list || []
   } finally {
     materialLoading.value = false
+  }
+}
+
+// ===== 打印订单列表 =====
+const printOrderList = ref<PrintOrderResp[]>([])
+const printOrderLoading = ref(false)
+const loadPrintOrders = async (customerId?: string) => {
+  printOrderLoading.value = true
+  try {
+    const query: any = { sort: ['id,desc'], page: 1, size: 200 }
+    if (customerId) query.customerId = customerId
+    const { data } = await listPrintOrder(query)
+    printOrderList.value = data.list || []
+  } finally {
+    printOrderLoading.value = false
   }
 }
 
@@ -264,11 +334,14 @@ const onCustomerChange = (val: string) => {
     if (form.deptId) {
       loadDeptPrices(form.deptId)
     }
+    // 按客户过滤打印订单
+    loadPrintOrders(val)
   } else {
     form.deptId = undefined
+    loadPrintOrders()
   }
   form.items.forEach((item) => {
-    if (item.materialId) {
+    if (item.itemType !== 'PRINT' && item.materialId) {
       refreshItemPrice(item)
     }
   })
@@ -283,25 +356,57 @@ watch(() => form.customerId, (newVal) => {
     if (form.deptId) {
       loadDeptPrices(form.deptId)
     }
+    loadPrintOrders(newVal)
   } else {
     form.deptId = undefined
+    loadPrintOrders()
   }
   form.items.forEach((item) => {
-    if (item.materialId) {
+    if (item.itemType !== 'PRINT' && item.materialId) {
       refreshItemPrice(item)
     }
   })
 })
 
+// ===== 打印订单选择 =====
+const onPrintOrderChange = (rowIndex: number) => {
+  const item = form.items[rowIndex]
+  if (item.printOrderId) {
+    const order = printOrderList.value.find((o) => String(o.id) === String(item.printOrderId))
+    if (order) {
+      item.unitPrice = order.totalAmount
+      item.quantity = 1
+      item.amount = order.totalAmount
+    }
+  } else {
+    item.unitPrice = undefined
+    item.amount = 0
+  }
+}
+
 // ===== 明细行操作 =====
-const addItem = () => {
-  form.items.push({
-    materialId: undefined,
-    unitPrice: undefined,
-    quantity: undefined,
-    amount: 0,
-    remark: '',
-  })
+const addItem = (type: 'MATERIAL' | 'PRINT' = 'MATERIAL') => {
+  if (type === 'PRINT') {
+    form.items.push({
+      itemType: 'PRINT',
+      materialId: undefined,
+      printOrderId: undefined,
+      unitPrice: undefined,
+      quantity: 1,
+      amount: 0,
+      remark: '',
+    })
+  } else {
+    form.items.push({
+      itemType: 'MATERIAL',
+      materialId: undefined,
+      printOrderId: undefined,
+      unitPrice: undefined,
+      quantity: undefined,
+      amount: 0,
+      remark: '',
+    })
+  }
 }
 
 const removeItem = (index: number) => {
@@ -333,25 +438,44 @@ const save = async () => {
     }
     for (let i = 0; i < form.items.length; i++) {
       const item = form.items[i]
-      if (!item.materialId) {
-        Message.warning(`第 ${i + 1} 行请选择物料`)
-        return false
-      }
-      if (!item.quantity || item.quantity <= 0) {
-        Message.warning(`第 ${i + 1} 行数量必须大于 0`)
-        return false
+      if (item.itemType === 'PRINT') {
+        if (!item.printOrderId) {
+          Message.warning(`第 ${i + 1} 行请选择打印订单`)
+          return false
+        }
+      } else {
+        if (!item.materialId) {
+          Message.warning(`第 ${i + 1} 行请选择物料`)
+          return false
+        }
+        if (!item.quantity || item.quantity <= 0) {
+          Message.warning(`第 ${i + 1} 行数量必须大于 0`)
+          return false
+        }
       }
     }
     await addFinBillingRecordWithItems({
       customerId: form.customerId!,
       deptId: form.deptId || undefined,
       billingDate: form.billingDate!,
-      items: form.items.map((it) => ({
-        materialId: it.materialId!,
-        quantity: it.quantity!,
-        unitPrice: it.unitPrice,
-        remark: it.remark || undefined,
-      })),
+      items: form.items.map((it) => {
+        if (it.itemType === 'PRINT') {
+          return {
+            itemType: 'PRINT',
+            printOrderId: it.printOrderId!,
+            quantity: 1,
+            unitPrice: it.unitPrice,
+            remark: it.remark || undefined,
+          }
+        }
+        return {
+          itemType: 'MATERIAL',
+          materialId: it.materialId!,
+          quantity: it.quantity!,
+          unitPrice: it.unitPrice,
+          remark: it.remark || undefined,
+        }
+      }),
     })
     Message.success('记账成功')
     emit('save-success')
@@ -373,8 +497,8 @@ const reset = () => {
 const onAdd = async () => {
   reset()
   visible.value = true
-  await Promise.all([loadCustomers(), loadMaterials(), getDeptList()])
-  addItem()
+  await Promise.all([loadCustomers(), loadMaterials(), loadPrintOrders(), getDeptList()])
+  addItem('MATERIAL')
 }
 
 defineExpose({ onAdd })

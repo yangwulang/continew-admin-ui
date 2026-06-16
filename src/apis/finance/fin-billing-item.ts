@@ -5,7 +5,9 @@ const BASE_URL = '/finance/fin-billing-item'
 export interface FinBillingItemResp {
   id: string
   billingRecordId: string
-  materialId: string
+  itemType: string
+  printOrderId: string | null
+  materialId: string | null
   materialName: string
   unitPrice: number
   quantity: number

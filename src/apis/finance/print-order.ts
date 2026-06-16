@@ -9,13 +9,14 @@ export interface PrintOrderResp {
   orderNo: string
   customerId: number
   customerName?: string
+  projectName?: string
   totalAmount: number
   status: string
   billingRecordId?: number
   remark?: string
   createTime?: string
   // 支付相关字段
-  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID'
+  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID' | 'BILLING'
   balancePaid: number
   thirdPartyPaid: number
   payChannel?: string
@@ -30,6 +31,7 @@ export interface PrintOrderDetailResp extends PrintOrderResp {
 
 export interface PrintOrderQuery {
   status?: string
+  customerId?: string
   sort: Array<string>
 }
 
@@ -82,7 +84,9 @@ export interface PrintPriceItemReq {
 
 export interface PrintPriceCalculateReq {
   customerId?: number
+  deptId?: number
   items: Array<PrintPriceItemReq>
+  couponCode?: string
 }
 
 export interface PriceDetail {
@@ -106,6 +110,8 @@ export interface ItemPriceResult {
 export interface PrintPriceCalculateResp {
   totalAmount: number
   items: Array<ItemPriceResult>
+  discountAmount?: number
+  finalAmount?: number
 }
 
 // ===== 文件上传 =====
@@ -121,10 +127,11 @@ export interface PrintFileUploadResp {
 export interface PrintOrderCreateResp {
   orderId: string
   orderNo: string
-  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID'
+  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID' | 'BILLING'
   totalAmount: number
   balancePaid: number
   remainAmount: number
+  billingCustomer?: boolean
 }
 
 // ===== 三方支付响应 =====
@@ -150,8 +157,11 @@ export interface PrintOrderItemCreateReq {
 
 export interface PrintOrderCreateReq {
   customerId: number
+  projectName?: string
+  deptId?: number
   items: Array<PrintOrderItemCreateReq>
   remark?: string
+  couponCode?: string
 }
 
 // ===== 聚合详情类型 =====
@@ -181,13 +191,14 @@ export interface PrintOrderFullDetailResp {
   orderNo: string
   customerId: number
   customerName?: string
+  projectName?: string
   totalAmount: number
   status: string
   billingRecordId?: number
   remark?: string
   createTime?: string
   updateTime?: string
-  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID'
+  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID' | 'BILLING'
   balancePaid: number
   thirdPartyPaid: number
   payChannel?: string
