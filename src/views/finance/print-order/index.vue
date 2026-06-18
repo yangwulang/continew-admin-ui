@@ -27,6 +27,19 @@
           <a-option value="COMPLETED">已完成</a-option>
           <a-option value="CANCELLED">已取消</a-option>
         </a-select>
+        <a-select
+          v-model="queryForm.printStatus"
+          placeholder="打印状态"
+          allow-clear
+          style="width: 150px"
+          @change="search"
+        >
+          <a-option value="PENDING">待打印</a-option>
+          <a-option value="PRINTING">打印中</a-option>
+          <a-option value="COMPLETED">已完成</a-option>
+          <a-option value="PARTIAL_FAILED">部分失败</a-option>
+          <a-option value="FAILED">全部失败</a-option>
+        </a-select>
         <a-button @click="reset">
           <template #icon><icon-refresh /></template>
           <template #default>重置</template>
@@ -37,6 +50,11 @@
           <template #icon><icon-plus /></template>
           <template #default>新建打印订单</template>
         </a-button>
+      </template>
+      <template #printStatus="{ record }">
+        <a-tag :color="printStatusColorMap[record.printStatus || 'PENDING']" size="small">
+          {{ printStatusLabelMap[record.printStatus || 'PENDING'] }}
+        </a-tag>
       </template>
       <template #status="{ record }">
         <a-tag :color="statusColorMap[record.status] || 'gray'" size="small">{{ statusLabelMap[record.status] || record.status }}</a-tag>
@@ -52,6 +70,15 @@
       <template #action="{ record }">
         <a-space>
           <a-link v-permission="['finance:fin-print-order:get']" title="详情" @click="onDetail(record)">详情</a-link>
+          <a-dropdown @select="(val: string) => onUpdatePrintStatus(record, val)">
+            <a-link title="更新打印状态">打印</a-link>
+            <template #content>
+              <a-doption value="PENDING">设为待打印</a-doption>
+              <a-doption value="PRINTING">设为打印中</a-doption>
+              <a-doption value="COMPLETED">设为已完成</a-doption>
+              <a-doption value="FAILED">设为失败</a-doption>
+            </template>
+          </a-dropdown>
           <a-link
             v-if="record.paymentStatus === 'UNPAID' || record.paymentStatus === 'PARTIAL'"
             title="支付"
@@ -117,6 +144,7 @@ import {
   type PrintOrderResp,
   deletePrintOrder,
   listPrintOrder,
+  updateItemPrintStatus,
 } from '@/apis/finance/print-order'
 import { generateFinBillingSignLink } from '@/apis/finance/fin-billing-record'
 import { useTable } from '@/hooks'
@@ -126,6 +154,20 @@ import http from '@/utils/http'
 
 defineOptions({ name: 'FinPrintOrder' })
 
+const printStatusLabelMap: Record<string, string> = {
+  PENDING: '待打印',
+  PRINTING: '打印中',
+  COMPLETED: '已完成',
+  PARTIAL_FAILED: '部分失败',
+  FAILED: '全部失败',
+}
+const printStatusColorMap: Record<string, string> = {
+  PENDING: 'orangered',
+  PRINTING: 'arcoblue',
+  COMPLETED: 'green',
+  PARTIAL_FAILED: 'orange',
+  FAILED: 'red',
+}
 const statusLabelMap: Record<string, string> = {
   PENDING: '待处理',
   CONFIRMED: '已确认',
@@ -157,6 +199,7 @@ const paymentStatusColorMap: Record<string, string> = {
 
 const queryForm = reactive<PrintOrderQuery>({
   status: undefined,
+  printStatus: undefined,
   sort: ['id,desc'],
 })
 
@@ -174,13 +217,14 @@ const columns: TableInstance['columns'] = [
   { title: '项目名称', dataIndex: 'projectName', width: 150 },
   { title: '金额', dataIndex: 'totalAmount', slotName: 'totalAmount', width: 120, align: 'right' },
   { title: '订单状态', dataIndex: 'status', slotName: 'status', width: 100, align: 'center' },
+  { title: '打印状态', dataIndex: 'printStatus', slotName: 'printStatus', width: 100, align: 'center' },
   { title: '支付状态', dataIndex: 'paymentStatus', slotName: 'paymentStatus', width: 130, align: 'center' },
   { title: '创建时间', dataIndex: 'createTime', width: 180 },
   {
     title: '操作',
     dataIndex: 'action',
     slotName: 'action',
-    width: 180,
+    width: 220,
     align: 'center',
     fixed: !isMobile() ? 'right' : undefined,
     show: has.hasPermOr(['finance:fin-print-order:get', 'finance:fin-print-order:delete']),
@@ -189,6 +233,7 @@ const columns: TableInstance['columns'] = [
 
 const reset = () => {
   queryForm.status = undefined
+  queryForm.printStatus = undefined
   search()
 }
 
@@ -220,6 +265,17 @@ const onPay = async (record: PrintOrderResp) => {
 const onPayDone = () => {
   payingRecord.value = null
   search()
+}
+
+// ===== 更新打印状态 =====
+const onUpdatePrintStatus = async (record: PrintOrderResp, status: string) => {
+  try {
+    await updateItemPrintStatus(record.id, status)
+    Message.success('打印状态已更新')
+    search()
+  } catch (e: any) {
+    Message.error(e?.msg || '更新失败')
+  }
 }
 
 // ===== 签名链接 =====

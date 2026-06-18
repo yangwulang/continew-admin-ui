@@ -22,7 +22,28 @@
           @dropdown-visible-change="onDropdownOpen"
         />
       </template>
+      <template #detailAddress>
+        <div style="display: flex; gap: 8px; width: 100%">
+          <a-input v-model="form.detailAddress" placeholder="请输入详细地址" style="flex: 1" />
+          <a-button type="primary" @click="openMapPicker">
+            <template #icon><icon-location /></template>
+            地图选取
+          </a-button>
+        </div>
+      </template>
     </GiForm>
+  </a-modal>
+
+  <!-- 地图选取弹窗 -->
+  <a-modal
+    v-model:visible="mapVisible"
+    title="地图选取地址"
+    :width="900"
+    :footer="false"
+    :mask-closable="false"
+    draggable
+  >
+    <MapPicker ref="mapPickerRef" :city="form.city" @select="onMapSelect" />
   </a-modal>
 </template>
 
@@ -31,8 +52,10 @@ import { Message } from '@arco-design/web-vue'
 import { useWindowSize } from '@vueuse/core'
 import { addFinCustomerAddress, getFinCustomerAddress, updateFinCustomerAddress } from '@/apis/finance/fin-customer-address'
 import { type ColumnItem, GiForm } from '@/components/GiForm'
+import MapPicker from '@/components/MapPicker/index.vue'
 import { useResetReactive } from '@/hooks'
 import type { LabelValueState } from '@/types/global'
+import type { MapAddressInfo } from '@/apis/system/map'
 import http from '@/utils/http'
 import { getAreaList } from '@/apis/area'
 
@@ -47,6 +70,8 @@ const visible = ref(false)
 const isUpdate = computed(() => !!dataId.value)
 const title = computed(() => (isUpdate.value ? '修改客户地址' : '新增客户地址'))
 const formRef = ref<InstanceType<typeof GiForm>>()
+const mapPickerRef = ref<InstanceType<typeof MapPicker>>()
+const mapVisible = ref(false)
 
 // 客户下拉选项
 const customerOptions = ref<LabelValueState[]>([])
@@ -182,9 +207,9 @@ const formColumns: ColumnItem[] = reactive([
   {
     label: '详细地址',
     field: 'detailAddress',
-    type: 'input',
     span: 24,
     required: true,
+    type: 'input', // slot 覆盖，仅用于校验
   },
   {
     label: '经度',
@@ -194,7 +219,8 @@ const formColumns: ColumnItem[] = reactive([
     props: {
       precision: 7,
       step: 0.0000001,
-      placeholder: '如: 116.4074013',
+      placeholder: '地图选取自动填入',
+      disabled: true,
     },
   },
   {
@@ -205,7 +231,8 @@ const formColumns: ColumnItem[] = reactive([
     props: {
       precision: 7,
       step: 0.0000001,
-      placeholder: '如: 39.9042147',
+      placeholder: '地图选取自动填入',
+      disabled: true,
     },
   },
   {
@@ -230,6 +257,29 @@ const formColumns: ColumnItem[] = reactive([
     },
   },
 ])
+
+// ---- 地图选取 ----
+const openMapPicker = () => {
+  mapVisible.value = true
+  nextTick(() => mapPickerRef.value?.init())
+}
+
+const onMapSelect = async (info: MapAddressInfo) => {
+  // 填充省市区
+  form.province = info.province
+  form.city = info.city
+  form.district = info.district
+  form.region = [info.province, info.city, info.district].filter(Boolean)
+  form.detailAddress = info.detailAddress
+  form.longitude = info.longitude
+  form.latitude = info.latitude
+  // 预加载级联选项，使省市区正确显示
+  if (info.province && info.city) {
+    await preloadRegion(info.province, info.city)
+  }
+  mapVisible.value = false
+  Message.success('地址选取成功')
+}
 
 // 重置
 const reset = () => {

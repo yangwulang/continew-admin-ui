@@ -6,10 +6,10 @@
       :data="dataList"
       :columns="columns"
       :loading="loading"
-      :scroll="{ x: '100%', y: '100%', minWidth: 1100 }"
-      :pagination="false"
+      :scroll="{ x: '100%', y: '100%', minWidth: 1400 }"
+      :pagination="pagination"
       :disabled-tools="['size']"
-      @refresh="loadData"
+      @refresh="search"
     >
       <template #toolbar-left>
         <a-select
@@ -17,11 +17,11 @@
           placeholder="按活动筛选"
           allow-clear
           style="width: 200px"
-          @change="loadData"
+          @change="search"
         >
           <a-option v-for="p in promotionList" :key="p.id" :value="p.id" :label="p.promoName" />
         </a-select>
-        <a-button @click="resetFilter">
+        <a-button @click="reset">
           <template #icon><icon-refresh /></template>
           重置
         </a-button>
@@ -34,7 +34,7 @@
       </template>
 
       <template #couponType="{ record }">
-        <a-tag v-if="record.couponType === 'DISCOUNT'" color="blue">折扣券 {{ (record.discountRate * 100).toFixed(0) }}折</a-tag>
+        <a-tag v-if="record.couponType === 'DISCOUNT'" color="blue">折扣券 {{ ((record.discountRate || 0) * 100).toFixed(0) }}折</a-tag>
         <a-tag v-else color="green">满减券 -¥{{ record.reduceAmount?.toFixed(2) }}</a-tag>
       </template>
       <template #minOrderAmount="{ record }">
@@ -52,81 +52,7 @@
       </template>
     </GiTable>
 
-    <!-- 新增/编辑弹窗 -->
-    <a-modal
-      v-model:visible="modalVisible"
-      :title="editId ? '编辑券模板' : '新增券模板'"
-      :mask-closable="false"
-      :width="600"
-      :ok-loading="submitting"
-      @before-ok="handleSubmit"
-      @close="resetModal"
-    >
-      <a-form ref="formRef" :model="form" layout="vertical">
-        <a-row :gutter="16">
-          <a-col :span="16">
-            <a-form-item label="模板名称" field="templateName" :rules="[{ required: true, message: '请输入模板名称' }]">
-              <a-input v-model="form.templateName" placeholder="如：五一折扣券" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="所属活动" field="promotionId">
-              <a-select v-model="form.promotionId" placeholder="选填" allow-clear style="width: 100%">
-                <a-option v-for="p in promotionList" :key="p.id" :value="p.id" :label="p.promoName" />
-              </a-select>
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="券类型" field="couponType" :rules="[{ required: true, message: '请选择券类型' }]">
-              <a-radio-group v-model="form.couponType" type="button">
-                <a-radio value="DISCOUNT">折扣券</a-radio>
-                <a-radio value="REDUCE">满减券</a-radio>
-              </a-radio-group>
-            </a-form-item>
-          </a-col>
-          <a-col v-if="form.couponType === 'DISCOUNT'" :span="12">
-            <a-form-item label="折扣率（0~1，如0.8=八折）" field="discountRate" :rules="[{ required: true, message: '请输入折扣率' }]">
-              <a-input-number v-model="form.discountRate" :min="0.01" :max="0.99" :precision="2" placeholder="0.80" style="width: 100%" />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="form.couponType === 'REDUCE'" :span="12">
-            <a-form-item label="减免金额（元）" field="reduceAmount" :rules="[{ required: true, message: '请输入减免金额' }]">
-              <a-input-number v-model="form.reduceAmount" :min="0.01" :precision="2" placeholder="5.00" style="width: 100%" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="最低消费金额（元，0=无门槛）" field="minOrderAmount">
-              <a-input-number v-model="form.minOrderAmount" :min="0" :precision="2" placeholder="0" style="width: 100%" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="发行总量（空=不限）" field="totalCount">
-              <a-input-number v-model="form.totalCount" :min="1" placeholder="不限" style="width: 100%" allow-clear />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="每人限领数量（空=不限）" field="perUserLimit">
-              <a-input-number v-model="form.perUserLimit" :min="1" placeholder="不限" style="width: 100%" allow-clear />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="有效天数（派发后N天有效）" field="validDays">
-              <a-input-number v-model="form.validDays" :min="1" placeholder="如：30" style="width: 100%" allow-clear />
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-form-item label="备注" field="remark">
-          <a-textarea v-model="form.remark" placeholder="备注信息（选填）" :auto-size="{ minRows: 2, maxRows: 4 }" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
-
+    <AddModal ref="AddModalRef" @save-success="search" />
     <!-- 派发弹窗 -->
     <a-modal
       v-model:visible="issueVisible"
@@ -184,57 +110,63 @@
 </template>
 
 <script setup lang="ts">
-import { Message, Modal } from '@arco-design/web-vue'
+import { Message } from '@arco-design/web-vue'
 import type { TableInstance } from '@arco-design/web-vue'
 import { useRoute } from 'vue-router'
+import AddModal from './AddModal.vue'
 import {
-  type CouponTemplateReq,
+  type CouponTemplateQuery,
   type CouponTemplateResp,
   type PromotionResp,
-  addCouponTemplate,
   deleteCouponTemplate,
   issueCoupon,
   listCouponTemplates,
   listPromotions,
-  updateCouponTemplate,
 } from '@/apis/finance/coupon'
 import { listFinCustomerDict } from '@/apis/finance/fin-customer'
 import type { LabelValueState } from '@/types/global'
 import { isMobile } from '@/utils'
+import { useTable } from '@/hooks'
 
 defineOptions({ name: 'FinCouponTemplate' })
 
 const route = useRoute()
-
-const dataList = ref<CouponTemplateResp[]>([])
-const loading = ref(false)
 const filterPromotionId = ref<string | undefined>(undefined)
-const promotionList = ref<PromotionResp[]>([])
-const customerDict = ref<LabelValueState[]>([])
 
-const loadPromotions = async () => {
-  const { data } = await listPromotions()
-  promotionList.value = data || []
-}
+const customerDict = ref<LabelValueState[]>([])
 
 const loadCustomerDict = async () => {
   const { data } = await listFinCustomerDict()
   customerDict.value = data || []
 }
 
-const loadData = async () => {
-  loading.value = true
-  try {
-    const { data } = await listCouponTemplates(filterPromotionId.value)
-    dataList.value = data || []
-  } finally {
-    loading.value = false
-  }
+const queryForm = reactive<CouponTemplateQuery>({
+  promotionId: undefined,
+  templateName: undefined,
+  couponType: undefined,
+  validDays: undefined,
+  expireTime: undefined,
+  isActive: undefined,
+  sort: ['id,desc'],
+})
+
+const {
+  tableData: dataList,
+  loading,
+  pagination,
+  search,
+  handleDelete,
+} = useTable((page) => listCouponTemplates({ ...queryForm, ...page }))
+
+const reset = () => {
+  filterPromotionId.value = undefined
+  search()
 }
 
-const resetFilter = () => {
-  filterPromotionId.value = undefined
-  loadData()
+const promotionList = ref<PromotionResp[]>([])
+const loadPromotions = async () => {
+  const { data } = await listPromotions()
+  promotionList.value = data || []
 }
 
 onMounted(() => {
@@ -242,19 +174,54 @@ onMounted(() => {
   if (route.query.promotionId) {
     filterPromotionId.value = route.query.promotionId as string
   }
-  loadPromotions()
   loadCustomerDict()
-  loadData()
+  loadPromotions()
+  // loadData()
 })
 
 const columns: TableInstance['columns'] = [
   { title: '模板名称', dataIndex: 'templateName', minWidth: 160, ellipsis: true, tooltip: true },
   { title: '券类型', dataIndex: 'couponType', slotName: 'couponType', width: 140 },
   { title: '使用门槛', dataIndex: 'minOrderAmount', slotName: 'minOrderAmount', width: 120 },
+  {
+    title: '适用条件',
+    dataIndex: 'applicableRule',
+    width: 160,
+    render: ({ record }) => {
+      if (!record.applicableRule) return '无限制'
+      try {
+        const rule = JSON.parse(record.applicableRule)
+        const parts: string[] = []
+        if (rule.minCopies) parts.push(`≥${rule.minCopies}份`)
+        if (rule.minPages) parts.push(`≥${rule.minPages}页`)
+        if (rule.applicableOptionIds?.length) parts.push(`${rule.applicableOptionIds.length}个选项`)
+        return parts.length > 0 ? parts.join('，') : '无限制'
+      } catch {
+        return '无限制'
+      }
+    },
+  },
   { title: '发行量', dataIndex: 'count', slotName: 'count', width: 80, align: 'center' },
   { title: '每人限领', dataIndex: 'perUserLimit', width: 80, align: 'center', render: ({ record }) => record.perUserLimit != null ? `${record.perUserLimit}张` : '不限' },
   { title: '有效天数', dataIndex: 'validDays', width: 80, align: 'center', render: ({ record }) => record.validDays != null ? `${record.validDays}天` : '固定日期' },
   { title: '备注', dataIndex: 'remark', minWidth: 100, ellipsis: true, tooltip: true },
+  {
+    title: '互斥/依赖',
+    dataIndex: 'couponRelation',
+    width: 120,
+    render: ({ record }) => {
+      if (!record.couponRelation) return '—'
+      try {
+        const rel = JSON.parse(record.couponRelation)
+        const parts: string[] = []
+        if (rel.excludeTemplateIds?.length) parts.push(`互斥${rel.excludeTemplateIds.length}个`)
+        if (rel.requireTemplateIds?.length) parts.push(`依赖${rel.requireTemplateIds.length}个`)
+        return parts.length > 0 ? parts.join('，') : '—'
+      } catch {
+        return '—'
+      }
+    },
+  },
   { title: '创建时间', dataIndex: 'createTime', width: 180 },
   {
     title: '操作',
@@ -266,98 +233,10 @@ const columns: TableInstance['columns'] = [
   },
 ]
 
-// ===== 新增/编辑 =====
-const modalVisible = ref(false)
-const submitting = ref(false)
-const editId = ref<string | undefined>(undefined)
-const formRef = ref()
-
-const form = reactive<CouponTemplateReq>({
-  promotionId: undefined,
-  templateName: '',
-  couponType: 'DISCOUNT',
-  discountRate: undefined,
-  reduceAmount: undefined,
-  minOrderAmount: 0,
-  totalCount: undefined,
-  perUserLimit: undefined,
-  validDays: undefined,
-  expireTime: undefined,
-  isActive: 1,
-  remark: '',
-})
-
-const resetModal = () => {
-  formRef.value?.resetFields()
-  editId.value = undefined
-  form.promotionId = undefined
-  form.templateName = ''
-  form.couponType = 'DISCOUNT'
-  form.discountRate = undefined
-  form.reduceAmount = undefined
-  form.minOrderAmount = 0
-  form.totalCount = undefined
-  form.perUserLimit = undefined
-  form.validDays = undefined
-  form.expireTime = undefined
-  form.isActive = 1
-  form.remark = ''
-}
-
-const onAdd = () => {
-  resetModal()
-  modalVisible.value = true
-}
-
-const onUpdate = (record: CouponTemplateResp) => {
-  resetModal()
-  editId.value = record.id
-  form.promotionId = record.promotionId
-  form.templateName = record.templateName
-  form.couponType = record.couponType
-  form.discountRate = record.discountRate
-  form.reduceAmount = record.reduceAmount
-  form.minOrderAmount = record.minOrderAmount ?? 0
-  form.totalCount = record.totalCount
-  form.perUserLimit = record.perUserLimit
-  form.validDays = record.validDays
-  form.expireTime = record.expireTime
-  form.isActive = record.isActive
-  form.remark = record.remark || ''
-  modalVisible.value = true
-}
-
-const handleSubmit = async () => {
-  const err = await formRef.value?.validate()
-  if (err) return false
-  submitting.value = true
-  try {
-    if (editId.value) {
-      await updateCouponTemplate(editId.value, form)
-      Message.success('修改成功')
-    } else {
-      await addCouponTemplate(form)
-      Message.success('新增成功')
-    }
-    loadData()
-    return true
-  } catch (e: any) {
-    Message.error(e?.msg || '操作失败')
-    return false
-  } finally {
-    submitting.value = false
-  }
-}
-
 const onDelete = (record: CouponTemplateResp) => {
-  Modal.confirm({
-    title: '确认删除',
+  return handleDelete(() => deleteCouponTemplate(record.id), {
     content: `确定要删除模板「${record.templateName}」吗？`,
-    onOk: async () => {
-      await deleteCouponTemplate(record.id)
-      Message.success('删除成功')
-      loadData()
-    },
+    showModal: true,
   })
 }
 
@@ -411,6 +290,14 @@ const copyCode = () => {
   }).catch(() => {
     Message.warning(`请手动复制券码：${issuedCode.value}`)
   })
+}
+
+const AddModalRef = ref<InstanceType<typeof AddModal>>()
+const onAdd = () => {
+  AddModalRef.value?.onAdd()
+}
+const onUpdate = (record: CouponTemplateResp) => {
+  AddModalRef.value?.onUpdate(record)
 }
 </script>
 

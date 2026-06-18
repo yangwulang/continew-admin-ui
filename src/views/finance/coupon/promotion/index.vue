@@ -24,7 +24,7 @@
       <template #isActive="{ record }">
         <a-switch
           :model-value="record.isActive === 1"
-          @change="(val: boolean) => onToggleStatus(record, val)"
+          @change="(value: string | number | boolean) => onToggleStatus(record, value as boolean)"
         />
       </template>
       <template #action="{ record }">

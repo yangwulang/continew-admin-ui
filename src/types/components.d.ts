@@ -51,6 +51,7 @@ declare module 'vue' {
     IconTreeReduce: typeof import('./../components/icons/IconTreeReduce.vue')['default']
     ImChat: typeof import('./../components/ImChat/index.vue')['default']
     JsonPretty: typeof import('./../components/JsonPretty/index.vue')['default']
+    MapPicker: typeof import('./../components/MapPicker/index.vue')['default']
     MinuteForm: typeof import('./../components/GenCron/CronForm/component/minute-form.vue')['default']
     MonthForm: typeof import('./../components/GenCron/CronForm/component/month-form.vue')['default']
     MultipartUpload: typeof import('./../components/MultipartUpload/index.vue')['default']

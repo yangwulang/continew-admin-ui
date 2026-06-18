@@ -218,31 +218,33 @@
 
       <!-- 优惠券 -->
       <a-divider orientation="left">优惠券</a-divider>
-      <a-row :gutter="16" style="margin-bottom: 8px">
-        <a-col :span="14">
-          <a-input
-            v-model="form.couponCode"
-            placeholder="输入优惠券码（选填）"
-            allow-clear
-            @blur="onCouponBlur"
-            @clear="clearCoupon"
-          >
-            <template #prefix><icon-gift /></template>
-          </a-input>
-        </a-col>
-        <a-col :span="6">
-          <a-button :loading="couponChecking" @click="onCouponBlur">验证券码</a-button>
-        </a-col>
-      </a-row>
-      <a-alert v-if="couponResult" :type="couponResult.valid ? 'success' : 'warning'" style="margin-bottom: 12px">
-        <template #message>
-          <template v-if="couponResult.valid">
-            券码有效！优惠金额：<strong>-¥{{ couponResult.discountAmount?.toFixed(2) }}</strong>
-            &nbsp;|&nbsp;折后价：<strong style="color: #f53f3f">¥{{ couponResult.finalAmount?.toFixed(2) }}</strong>
+      <a-empty v-if="!form.customerId" description="请先选择客户" />
+      <template v-else>
+        <a-spin :loading="couponListLoading" style="width: 100%">
+          <a-checkbox-group v-model="selectedCouponIds" @change="onCouponSelectChange">
+            <div v-for="c in availableCoupons" :key="c.record.id" style="margin-bottom: 8px">
+              <a-checkbox :value="Number(c.record.id)" :disabled="!!c.failReason">
+                <a-tag color="purple" size="small">{{ c.template.templateName }}</a-tag>
+                <a-tag size="small" :color="c.template.couponType === 'DISCOUNT' ? 'blue' : 'green'">
+                  {{ c.template.couponType === 'DISCOUNT' ? `${(c.template.discountRate ?? 0) * 10}折` : `减${c.template.reduceAmount?.toFixed(2)}元` }}
+                </a-tag>
+                <span v-if="c.template.minOrderAmount" style="color: #86909c; font-size: 12px">满{{ c.template.minOrderAmount }}可用</span>
+                <span v-if="c.failReason" style="color: #f53f3f; font-size: 12px; margin-left: 4px">{{ c.failReason }}</span>
+              </a-checkbox>
+            </div>
+          </a-checkbox-group>
+          <a-empty v-if="availableCoupons.length === 0" description="暂无可用优惠券" />
+        </a-spin>
+        <a-alert v-if="batchCouponResult && batchCouponResult.valid" type="success" style="margin-top: 8px">
+          <template #message>
+            已选 {{ selectedCouponIds.length }} 张券，优惠：<strong>-¥{{ batchCouponResult.totalDiscount?.toFixed(2) }}</strong>
+            &nbsp;|&nbsp;折后价：<strong style="color: #f53f3f">¥{{ batchCouponResult.finalAmount?.toFixed(2) }}</strong>
           </template>
-          <template v-else>{{ couponResult.message }}</template>
-        </template>
-      </a-alert>
+        </a-alert>
+        <a-alert v-if="batchCouponResult && !batchCouponResult.valid" type="warning" style="margin-top: 8px">
+          <template #message>{{ batchCouponResult.message }}</template>
+        </a-alert>
+      </template>
 
       <!-- 备注 -->
       <a-form-item label="备注" field="remark" style="margin-top: 8px">
@@ -279,7 +281,7 @@ import {
   listPrintAttributes,
   uploadPrintFile,
 } from '@/apis/finance/print-order'
-import { type CouponCheckResult, checkCoupon } from '@/apis/finance/coupon'
+import { type AvailableCouponInfo, type MultiCouponCheckResult, checkBatchCoupons, listAvailableCoupons } from '@/apis/finance/coupon'
 import { getAvailableOptions, validatePrintConfig } from '@/apis/finance/printConfigRule'
 import { type FinCustomerResp, listFinCustomer } from '@/apis/finance/fin-customer'
 
@@ -322,6 +324,7 @@ const form = reactive({
   remark: '',
   opt: {} as Record<number, Record<number, number | number[]>>,
   couponCode: '',
+  couponRecordIds: [] as number[],
 })
 
 // 每个文件项的上传状态和文件列表
@@ -381,30 +384,73 @@ const priceResult = ref<PrintPriceCalculateResp | null>(null)
 const priceLoading = ref(false)
 let priceTimer: ReturnType<typeof setTimeout> | null = null
 
-// 优惠券验证
-const couponChecking = ref(false)
-const couponResult = ref<CouponCheckResult | null>(null)
+// 优惠券多券选择
+const availableCoupons = ref<AvailableCouponInfo[]>([])
+const couponListLoading = ref(false)
+const selectedCouponIds = ref<number[]>([])
+const batchCouponResult = ref<MultiCouponCheckResult | null>(null)
 
-const clearCoupon = () => {
-  couponResult.value = null
-}
-
-const onCouponBlur = async () => {
-  if (!form.couponCode?.trim()) {
-    couponResult.value = null
+const loadAvailableCoupons = async () => {
+  if (!form.customerId) {
+    availableCoupons.value = []
     return
   }
-  couponChecking.value = true
+  couponListLoading.value = true
   try {
     const orderAmount = priceResult.value?.totalAmount
-    const { data } = await checkCoupon(form.couponCode.trim(), form.customerId, orderAmount)
-    couponResult.value = data
+    const allOptionIds = form.items.flatMap((_item, idx) => {
+      const opts = form.opt[idx] || {}
+      return Object.values(opts).flatMap((v) => Array.isArray(v) ? v : [v]).filter(Boolean)
+    })
+    const totalCopies = form.items.reduce((s, i) => s + (i.copies || 0), 0)
+    const totalPages = form.items.reduce((s, i) => s + (i.pageCount * i.copies || 0), 0)
+    const { data } = await listAvailableCoupons(form.customerId, orderAmount, allOptionIds as number[], totalCopies, totalPages)
+    availableCoupons.value = data
   } catch {
-    couponResult.value = null
+    availableCoupons.value = []
   } finally {
-    couponChecking.value = false
+    couponListLoading.value = false
   }
 }
+
+const onCouponSelectChange = async () => {
+  form.couponRecordIds = [...selectedCouponIds.value]
+  if (selectedCouponIds.value.length === 0) {
+    batchCouponResult.value = null
+    return
+  }
+  try {
+    const orderAmount = priceResult.value?.totalAmount
+    const allOptionIds = form.items.flatMap((_item, idx) => {
+      const opts = form.opt[idx] || {}
+      return Object.values(opts).flatMap((v) => Array.isArray(v) ? v : [v]).filter(Boolean)
+    })
+    const totalCopies = form.items.reduce((s, i) => s + (i.copies || 0), 0)
+    const totalPages = form.items.reduce((s, i) => s + (i.pageCount * i.copies || 0), 0)
+    const { data } = await checkBatchCoupons({
+      recordIds: selectedCouponIds.value,
+      customerId: form.customerId ? Number(form.customerId) : undefined,
+      orderAmount,
+      optionIds: allOptionIds as number[],
+      totalCopies,
+      totalPages,
+    })
+    batchCouponResult.value = data
+  } catch {
+    batchCouponResult.value = null
+  }
+}
+
+watch(() => form.customerId, () => {
+  selectedCouponIds.value = []
+  form.couponRecordIds = []
+  batchCouponResult.value = null
+  loadAvailableCoupons()
+})
+
+watch(() => priceResult.value?.totalAmount, () => {
+  loadAvailableCoupons()
+})
 
 watch(() => itemOptions, () => {
   form.opt = itemOptions
@@ -726,7 +772,7 @@ const handleSubmit = async () => {
       deptId: getCustomerDeptId() as unknown as number,
       items,
       remark: form.remark,
-      couponCode: form.couponCode?.trim() || undefined,
+      couponRecordIds: form.couponRecordIds.length > 0 ? form.couponRecordIds : undefined,
     })
 
     if (createResp.paymentStatus === 'PAID') {
@@ -783,7 +829,10 @@ const resetForm = () => {
   form.items = []
   form.remark = ''
   form.couponCode = ''
-  couponResult.value = null
+  form.couponRecordIds = []
+  selectedCouponIds.value = []
+  batchCouponResult.value = null
+  availableCoupons.value = []
   Object.keys(fileLists).forEach((k) => delete fileLists[Number(k)])
   Object.keys(uploadLoadings).forEach((k) => delete uploadLoadings[Number(k)])
   Object.keys(itemOptions).forEach((k) => delete itemOptions[Number(k)])

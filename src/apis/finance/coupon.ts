@@ -1,5 +1,7 @@
 import http from '@/utils/http'
 
+const BASE_URL = '/finance/coupon'
+
 // ==================== 梯度定价规则 ====================
 
 export interface PagePriceRuleResp {
@@ -71,7 +73,7 @@ export interface PromotionReq {
 }
 
 export function listPromotions() {
-  return http.get<PromotionResp[]>('/finance/coupon/promotion/list')
+  return http.get<PromotionResp[]>('/finance/coupon/promotion/lists')
 }
 
 export function addPromotion(data: PromotionReq) {
@@ -106,6 +108,9 @@ export interface CouponTemplateResp {
   expireTime?: string
   isActive: number
   remark?: string
+  applicableRule?: string
+  couponRelation?: string
+  maxDiscountRate?: number
   createTime: string
 }
 
@@ -122,14 +127,29 @@ export interface CouponTemplateReq {
   expireTime?: string
   isActive?: number
   remark?: string
+  applicableRule?: string
+  couponRelation?: string
+  maxDiscountRate?: number
 }
 
-export function listCouponTemplates(promotionId?: string) {
-  return http.get<CouponTemplateResp[]>('/finance/coupon/template/list', { promotionId })
+export interface CouponTemplateQuery {
+  promotionId?: string
+  templateName?: string
+  couponType?: 'DISCOUNT' | 'REDUCE'
+  validDays?: number
+  expireTime?: string
+  isActive?: number
+  sort: Array<string>
+}
+
+export interface CouponTemplatePageQuery extends CouponTemplateQuery, PageQuery {}
+
+export function listCouponTemplates(query: CouponTemplatePageQuery) {
+  return http.get<PageRes<CouponTemplateResp[]>>(`${BASE_URL}/template`, query)
 }
 
 export function addCouponTemplate(data: CouponTemplateReq) {
-  return http.post<void>('/finance/coupon/template', data)
+  return http.post('/finance/coupon/template', data)
 }
 
 export function updateCouponTemplate(id: string, data: CouponTemplateReq) {
@@ -185,4 +205,43 @@ export function listCoupons(templateId?: string, status?: string) {
 
 export function listCustomerCoupons(customerId: string, status?: string) {
   return http.get<CouponRecordResp[]>('/finance/coupon/customer/list', { customerId, status })
+}
+
+// ==================== 多券叠加 ====================
+
+export interface MultiCouponCheckResult {
+  valid: boolean
+  message?: string
+  totalDiscount: number
+  finalAmount: number
+  items: CouponDiscountItem[]
+}
+
+export interface CouponDiscountItem {
+  recordId: number
+  templateId: number
+  templateName: string
+  couponType: string
+  discountAmount: number
+}
+
+export interface AvailableCouponInfo {
+  record: CouponRecordResp
+  template: CouponTemplateResp
+  failReason?: string | null
+}
+
+export function checkBatchCoupons(data: {
+  recordIds: number[]
+  customerId?: number
+  orderAmount?: number
+  optionIds?: number[]
+  totalCopies?: number
+  totalPages?: number
+}) {
+  return http.post<MultiCouponCheckResult>('/finance/coupon/check-batch', data)
+}
+
+export function listAvailableCoupons(customerId: string, orderAmount?: number, optionIds?: number[], totalCopies?: number, totalPages?: number) {
+  return http.get<AvailableCouponInfo[]>('/finance/coupon/available', { customerId, orderAmount, optionIds: optionIds?.join(','), totalCopies, totalPages })
 }

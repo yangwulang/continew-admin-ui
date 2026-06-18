@@ -12,6 +12,7 @@ export interface PrintOrderResp {
   projectName?: string
   totalAmount: number
   status: string
+  printStatus?: 'PENDING' | 'PRINTING' | 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED'
   billingRecordId?: number
   remark?: string
   createTime?: string
@@ -31,6 +32,7 @@ export interface PrintOrderDetailResp extends PrintOrderResp {
 
 export interface PrintOrderQuery {
   status?: string
+  printStatus?: string
   customerId?: string
   sort: Array<string>
 }
@@ -48,6 +50,7 @@ export interface PrintOrderItemResp {
   copies: number
   subtotalAmount: number
   sort: number
+  printStatus?: 'PENDING' | 'PRINTING' | 'COMPLETED' | 'FAILED'
   createTime?: string
 }
 
@@ -87,6 +90,7 @@ export interface PrintPriceCalculateReq {
   deptId?: number
   items: Array<PrintPriceItemReq>
   couponCode?: string
+  couponRecordIds?: number[]
 }
 
 export interface PriceDetail {
@@ -112,6 +116,15 @@ export interface PrintPriceCalculateResp {
   items: Array<ItemPriceResult>
   discountAmount?: number
   finalAmount?: number
+  couponDetails?: CouponDiscountDetail[]
+}
+
+export interface CouponDiscountDetail {
+  recordId: number
+  templateId: number
+  templateName: string
+  couponType: string
+  discountAmount: number
 }
 
 // ===== 文件上传 =====
@@ -162,6 +175,7 @@ export interface PrintOrderCreateReq {
   items: Array<PrintOrderItemCreateReq>
   remark?: string
   couponCode?: string
+  couponRecordIds?: number[]
 }
 
 // ===== 聚合详情类型 =====
@@ -183,7 +197,18 @@ export interface PrintOrderItemWithOptions {
   copies: number
   subtotalAmount: number
   sort: number
+  printStatus?: 'PENDING' | 'PRINTING' | 'COMPLETED' | 'FAILED'
   options: PrintOrderOptionDetail[]
+}
+
+export interface OrderCouponDetail {
+  recordId: number
+  templateId: number
+  templateName: string
+  couponType: string
+  discountRate?: number
+  reduceAmount?: number
+  discountAmount: number
 }
 
 export interface PrintOrderFullDetailResp {
@@ -194,6 +219,7 @@ export interface PrintOrderFullDetailResp {
   projectName?: string
   totalAmount: number
   status: string
+  printStatus?: 'PENDING' | 'PRINTING' | 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED'
   billingRecordId?: number
   remark?: string
   createTime?: string
@@ -203,6 +229,10 @@ export interface PrintOrderFullDetailResp {
   thirdPartyPaid: number
   payChannel?: string
   expireTime?: string
+  couponCode?: string
+  discountAmount?: number
+  originalAmount?: number
+  couponDetails?: OrderCouponDetail[]
   items: PrintOrderItemWithOptions[]
 }
 
@@ -292,4 +322,12 @@ export interface PrintOrderOptionQuery extends PageQuery {
 
 export function listPrintOrderOptions(query: PrintOrderOptionQuery) {
   return http.get<PageRes<PrintOrderOptionResp[]>>(ORDER_OPTION_URL, query)
+}
+
+export function updateItemPrintStatus(itemId: string, status: string) {
+  return http.put<void>(`${BASE_URL}/items/${itemId}/print-status`, undefined, { params: { status } })
+}
+
+export function syncOrderPrintStatus(id: string) {
+  return http.post<void>(`${BASE_URL}/${id}/sync-print-status`)
 }

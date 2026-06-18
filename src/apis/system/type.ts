@@ -531,3 +531,23 @@ export interface CompleteMultipartUploadReq {
 export interface CancelUploadParams {
   uploadId: string
 }
+
+/** 区域管理 */
+export interface RegionResp {
+  id: string
+  name: string
+  code: string
+  parentId: string
+  level: number
+  status: 1 | 2
+  sort: number
+  updateUserString: string
+  updateTime: string
+  children: RegionResp[]
+}
+
+export interface RegionQuery {
+  description?: string
+  level?: number
+  status?: number
+}

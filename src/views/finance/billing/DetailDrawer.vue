@@ -1,5 +1,5 @@
 <template>
-  <a-drawer v-model:visible="visible" title="记账详情" :width="width >= 700 ? 700 : '100%'" :footer="false">
+  <a-drawer v-model:visible="visible" title="记账详情" :width="width >= 700 ? 1100 : '100%'" :footer="false">
     <a-descriptions :column="2" size="large" class="general-description">
       <a-descriptions-item label="记账日期">{{ dataDetail?.billingDate }}</a-descriptions-item>
       <a-descriptions-item label="客户名称">{{ dataDetail?.customerName || dataDetail?.customerId }}</a-descriptions-item>
